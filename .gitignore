@@ -9,3 +9,7 @@ ottisk-submission.zip
 submission/ottisk-source.zip
 # The demo video shows real photographs of people; it goes to the jury in the archive, not to the public repository.
 submission/ottisk-demo.mp4
+
+# The folder assembled for Vercel by tools/vercel_site.py.
+.hosted/
+.vercel/

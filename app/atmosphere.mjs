@@ -214,7 +214,7 @@ export function makeImprint(story, photos, audio, reading) {
   const caption = [...sentences].sort((a,b)=>Math.abs(a.length-83)-Math.abs(b.length-83))[0];
   const excerpt = caption.length > 152 ? caption.slice(0,148).replace(/\s+\S*$/u,'')+'…' : caption;
   return {
-    v:3, title:String(read.title || '').trim() || localTitle(story), excerpt, text, pictured, feelings, moodName:feelingLabel(feelings),
+    v:4, title:String(read.title || '').trim() || localTitle(story), excerpt, text, pictured, feelings, moodName:feelingLabel(feelings),
     light, photoHue:Math.round(photo.hue), photoSat:Math.round(photo.sat), ...sceneTokens(feelings, {...photo, light}, audio)
   };
 }

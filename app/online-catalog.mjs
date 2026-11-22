@@ -13,6 +13,14 @@ function httpsLink(value) {
   }
 }
 
+// The catalogue returns names with HTML entities («Key &amp; Eddie»); a textarea decodes them without running anything.
+const holder = typeof document === 'undefined' ? null : document.createElement('textarea');
+function plain(value) {
+  if (!holder || !value.includes('&')) return value;
+  holder.innerHTML = value;
+  return holder.value;
+}
+
 function normalizeTrack(row) {
   if (!row || row.category !== 'music' || row.mature || !row.id || !row.title?.trim() || !row.creator?.trim()) return null;
   const sourceUrl = httpsLink(row.foreign_landing_url);
@@ -27,14 +35,14 @@ function normalizeTrack(row) {
   const code = match[1] === 'licenses/by' ? 'by' : 'cc0';
   if (row.license !== code || (row.license_version && row.license_version !== match[2])) return null;
 
-  const title = row.title.trim();
-  const artist = row.creator.trim();
+  const title = plain(row.title.trim());
+  const artist = plain(row.creator.trim());
   const license = (code === 'by' ? 'CC BY ' : 'CC0 ') + match[2];
   return {
     id: row.id, title, artist, audioUrl, sourceUrl, license, licenseUrl,
     licenseCode: code, provider: row.source || row.provider || 'Openverse',
     creatorUrl: httpsLink(row.creator_url),
-    attribution: row.attribution || `«${title}» — ${artist}, ${license}.`,
+    attribution: row.attribution ? plain(row.attribution) : `«${title}» — ${artist}, ${license}.`,
     duration: Number.isFinite(row.duration) && row.duration > 0 ? Math.round(row.duration / 1000) : null,
     genres: (row.genres || []).filter(genre => typeof genre === 'string'),
     tags: (row.tags || []).map(tag => tag?.name).filter(name => typeof name === 'string')

@@ -106,6 +106,9 @@ nav,.archive-actions{display:flex;align-items:center;gap:24px}
   filter:contrast(var(--contrast)) saturate(var(--filter-sat)) sepia(var(--sepia)) brightness(var(--bright));
   transition:opacity var(--fade) ease,transform .55s ease}
 .frame.visible{opacity:1}
+/* The treatment of the picture (strokes, planes, long exposure) comes first, the grading after it. */
+.treat{position:absolute;width:0;height:0}
+[data-treat] .frame{filter:var(--treat) contrast(var(--contrast)) saturate(var(--filter-sat)) sepia(var(--sepia)) brightness(var(--bright))}
 .wash,.leak,.scrim,.grain,.motif{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 /* Leading feeling: a wash of its colour over the photograph. */
 .wash{z-index:1;background:hsl(var(--hue) var(--sat) 52%);opacity:calc(var(--wash) * 1.8);mix-blend-mode:soft-light}
@@ -321,6 +324,9 @@ form fieldset{margin:14px 0 12px;border:1px solid var(--edge);border-radius:var(
   .card-caption time{font-size:.75rem}
   .day-toolbar{padding:16px 0}.day-toolbar .plain{font-size:.8rem;padding-inline:.66rem}
   .scene-text{padding-bottom:60px;max-width:100%}.memory{min-height:455px}
+  /* A long word must fit a phone: the title steps down and, where the browser can, hyphenates. */
+  .scene-text h1{font-size:calc(clamp(2.2rem,9.6vw,2.8rem) * var(--title-scale));hyphens:auto}
+  .featured h2{font-size:calc(clamp(2.2rem,9.6vw,3rem) * var(--title-scale));hyphens:auto}
   .transport{flex-wrap:wrap;gap:10px}.transport audio{width:100%;margin:0}.transport>a{margin:0}
   .notes{grid-template-columns:1fr;gap:26px;padding:26px 0 40px}
   .tune-grid{grid-template-columns:1fr}
@@ -357,6 +363,8 @@ form .music-field{padding:0;margin:0;border:0}
 #music-picks{max-height:min(37vh,340px);overflow:auto;overscroll-behavior:contain}
 
 .image-generator legend{padding:0 4px;font-weight:650}
+/* Without a generator only its one-line note stays. */
+.image-generator[data-offline]>:not(legend,#image-status){display:none}
 .image-options{display:flex;align-items:end;flex-wrap:wrap;gap:10px;margin:12px 0 4px}
 .image-options label{margin:0;flex:1;min-width:145px}
 #image-status:not(:empty){margin-top:8px}

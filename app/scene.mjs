@@ -52,6 +52,58 @@ export function themeVars(tokens) {
 export const themeStyle = tokens => Object.entries(themeVars(tokens)).map(([name, value]) => `${name}:${value}`).join(';');
 
 // ---------------------------------------------------------------------------
+// The treatment of the photograph, as an SVG filter: the sliders redraw it at
+// once and the exported folder carries it without any other file.
+// `size` is the width of the picture relative to a full scene; a card is about a third.
+const TREAT_FROM = .08;
+function treatmentSVG(imprint, id, size) {
+  const {paint = 0, plane = 0, smear = 0, sweep = 0} = imprint;
+  const steps = [];
+  let last = 'SourceGraphic';
+  const px = value => Math.max(0, value).toFixed(2);
+  if (paint >= TREAT_FROM) {
+    // Dabs of colour: small details merge into patches, a noise field pushes the patches
+    // off their edges, and a soft pass joins them. Solitude and quiet stretch the field
+    // and the soft pass along the horizon, so the strokes lie long and level.
+    const reach = paint * size;
+    const lie = 1 + 2.4 * sweep;
+    steps.push(
+      `<feTurbulence type="fractalNoise" baseFrequency="${(.08 / lie / size).toFixed(4)} ${(.08 * (1 + .5 * sweep) / size).toFixed(4)}" numOctaves="2" seed="7" result="field"/>`,
+      `<feMorphology in="${last}" operator="erode" radius="${px(1.4 * reach)}" result="worn"/>`,
+      `<feMorphology in="worn" operator="dilate" radius="${px(1.8 * reach)}" result="dabs"/>`,
+      `<feDisplacementMap in="dabs" in2="field" scale="${px(11 * reach)}" xChannelSelector="R" yChannelSelector="G" result="strokes"/>`,
+      `<feGaussianBlur in="strokes" stdDeviation="${px((.5 + 2.8 * sweep) * reach)} ${px(.5 * reach)}" result="paint"/>`);
+    last = 'paint';
+  }
+  if (plane >= TREAT_FROM) {
+    // Flat planes: harder edges, then each colour falls to the nearest of a few steps.
+    const share = (.9 * plane).toFixed(2);
+    steps.push(
+      `<feConvolveMatrix in="${last}" order="3" kernelMatrix="0 -1 0 -1 5 -1 0 -1 0" preserveAlpha="true" result="edges"/>`,
+      `<feComponentTransfer in="edges" result="steps">${['R', 'G', 'B'].map(channel => `<feFunc${channel} type="discrete" tableValues="0 .14 .34 .6 .84 1"/>`).join('')}</feComponentTransfer>`,
+      `<feComposite in="steps" in2="${last}" operator="arithmetic" k1="0" k2="${share}" k3="${(1 - share).toFixed(2)}" k4="0" result="plane"/>`);
+    last = 'plane';
+  }
+  if (smear >= TREAT_FROM) {
+    // A long exposure: the lights travel sideways, the dark parts stay where they were.
+    steps.push(
+      `<feGaussianBlur in="${last}" stdDeviation="${px(26 * smear * size)} 0" result="trail"/>`,
+      `<feBlend in="trail" in2="${last}" mode="lighten" result="smear"/>`);
+    last = 'smear';
+  }
+  if (!steps.length) return '';
+  // Strokes pull in the empty space beyond the edge; the untouched frame underneath fills it.
+  return `<svg class="treat" width="0" height="0" aria-hidden="true" focusable="false"><filter id="${id}" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">${steps.join('')}<feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="${last}"/></feMerge></filter></svg>`;
+}
+
+// One picture can stand on a page three times (hero, card, scene), so each place has its own filter.
+export function treatment(imprint, key, size = 1) {
+  const id = 'treat-' + String(key).replace(/[^\w-]/g, '');
+  const svg = treatmentSVG(imprint, id, size);
+  return {svg, style: svg ? `;--treat:url(#${id})` : '', attr: svg ? ' data-treat' : ''};
+}
+
+// ---------------------------------------------------------------------------
 // The imprint: eight spokes, opposite feelings on opposite sides of the wheel.
 const spoke = (index, radius) => {
   const angle = (index * 45 - 90) * Math.PI / 180;
@@ -183,8 +235,9 @@ export function sceneHTML(day, sources, dateText, heading = 'h1') {
   const frames = sources.map((source, index) => `<img class="frame${index ? '' : ' visible'}" src="${escape(source)}" alt="">`).join('');
   const dots = sources.length > 1 ? `<div class="positions" aria-label="Кадры">${sources.map((_, index) =>
     `<button class="dot" type="button" data-index="${index}" aria-label="Кадр ${index + 1}" aria-pressed="${index === 0}"></button>`).join('')}</div>` : '';
-  return `<section class="memory" data-face="${i.face}" data-place="${i.place}" data-duration="${i.duration}" style="${sceneStyle(i)}">
-    <div class="frames" aria-hidden="true">${frames}</div>${layersHTML(i, day.id)}
+  const treat = treatment(i, 's-' + day.id);
+  return `<section class="memory" data-face="${i.face}" data-place="${i.place}" data-duration="${i.duration}"${treat.attr} style="${sceneStyle(i)}${treat.style}">
+    ${treat.svg}<div class="frames" aria-hidden="true">${frames}</div>${layersHTML(i, day.id)}
     <div class="scene-text"><time datetime="${escape(day.date)}">${escape(dateText)}</time><${heading} id="day-heading">${escape(i.title)}</${heading}><p>${escape(i.excerpt)}</p></div>${dots}
   </section>`;
 }
@@ -228,9 +281,10 @@ export function rulesHTML(imprint) {
   const say = (id, text) => { if (f[id] >= .3) rules.push([id, text]); };
   say('joy', 'кадр светлее, цвета насыщеннее');
   say('sadness', 'кадр темнее и глуше, по краям тень');
-  say('calm', 'мягкие углы, длинные растворения между кадрами');
-  say('tension', imprint.face === 'grotesk' ? 'сетка, рубленый заголовок, резкие склейки' : 'контраст выше, углы острее');
-  say('festive', 'световые следы, крупный заголовок, быстрый ритм');
+  const shown = value => value >= TREAT_FROM;
+  say('calm', 'мягкие углы, длинные растворения' + (!shown(imprint.paint) ? '' : imprint.sweep >= .45 ? ', кадр ложится длинными ровными мазками' : ', кадр распадается на короткие мазки'));
+  say('tension', (imprint.face === 'grotesk' ? 'сетка, рубленый заголовок, резкие склейки' : 'контраст выше, углы острее') + (shown(imprint.plane) ? ', кадр собран в плоскости цвета' : ''));
+  say('festive', 'световые следы, крупный заголовок, быстрый ритм' + (shown(imprint.smear) ? ', свет на кадре тянется, как при длинной выдержке' : ''));
   say('quiet', 'мало движения, заголовок меньше, графика приглушена');
   say('warmth', 'тёплая засветка и плёночное зерно');
   say('solitude', 'поля вокруг кадра, линия горизонта, холоднее цвет');

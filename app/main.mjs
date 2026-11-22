@@ -7,7 +7,7 @@ import {setupImagePicker} from './image-picker.mjs';
 import {setupVoiceEntry} from './voice-entry.mjs';
 import {downloadArchive, downloadDay} from './export.mjs';
 import {IDS, emptyFeelings, feelingLabel, feelingName, foldDiary, localReading, siteTokens} from './feelings.mjs';
-import {escape, layersHTML, motifSVG, number, pairsHTML, rulesHTML, sceneHTML, sceneStyle, stampSVG, themeVars, tuneHTML} from './scene.mjs';
+import {escape, layersHTML, motifSVG, number, pairsHTML, rulesHTML, sceneHTML, sceneStyle, stampSVG, themeVars, treatment, tuneHTML} from './scene.mjs';
 import {readStory, readingStatus} from './reading.mjs';
 
 const root = document.documentElement;
@@ -32,7 +32,7 @@ let renderCleanup = () => {};
 let noticeTimer;
 let busy = false;
 let step = 1;
-let model = {available:false, model:'', server:true};
+let model = {available:false, model:'', server:true, hosted:false};
 
 const announce = message => {
   clearTimeout(noticeTimer);
@@ -78,6 +78,7 @@ function renderArchive(photo) {
   const mood=diary();
   applyTheme(mood.state,{keep:mood.lead,keepSecond:mood.second});
   const [lead] = days;
+  const leadTreat = lead && treatment(lead.imprint,'f-'+lead.id);
   if (!lead) {
     main.innerHTML = '<section class="welcome first"><h1>Дневник ощущений</h1><p>Здесь пока нет ни одного дня. Расскажите, каким он был, добавьте фото и песню, и дневник соберёт из них воспоминание.</p><button class="primary" id="first-day">Записать день</button></section>';
     main.querySelector('#first-day').addEventListener('click',openEditor);
@@ -85,8 +86,8 @@ function renderArchive(photo) {
   }
   main.innerHTML = `
     <section class="welcome"><h1>Дневник ощущений</h1><p>Фотографии, слова и музыка. То, каким запомнился день.</p></section>
-    <a href="${href(lead.id)}" class="featured" data-face="${lead.imprint.face}" data-place="${lead.imprint.place}" style="${sceneStyle(lead.imprint)}" aria-label="Открыть день: ${escape(lead.imprint.title)}">
-      <div class="frames"><img class="frame visible" src="${escape(photo(lead,lead.id==='maple'?2:0))}" alt=""></div>${layersHTML(lead.imprint,lead.id)}
+    <a href="${href(lead.id)}" class="featured" data-face="${lead.imprint.face}" data-place="${lead.imprint.place}"${leadTreat.attr} style="${sceneStyle(lead.imprint)}${leadTreat.style}" aria-label="Открыть день: ${escape(lead.imprint.title)}">
+      ${leadTreat.svg}<div class="frames"><img class="frame visible" src="${escape(photo(lead,lead.id==='maple'?2:0))}" alt=""></div>${layersHTML(lead.imprint,lead.id)}
       <div class="featured-text"><span class="eyebrow">Последняя запись</span><h2>${escape(lead.imprint.title)}</h2><p>${formatDate(lead.date)} <span class="separator">·</span> ${lead.imprint.moodName}</p><span class="feature-action">Пережить день</span></div>
     </a>
     <section class="diary-mood" aria-labelledby="mood-title">
@@ -111,9 +112,9 @@ function renderArchive(photo) {
     });
     const unit = {one:'запись',few:'записи',many:'записей'}[new Intl.PluralRules('ru').select(filtered.length)];
     main.querySelector('#count').textContent=`${filtered.length} ${unit}`;
-    grid.innerHTML = filtered.length ? filtered.map(day=>`
-      <a class="day-card" href="${href(day.id)}" aria-label="Открыть день: ${escape(day.imprint.title)}"><div class="thumb" style="${sceneStyle(day.imprint)}"><div class="frames"><img class="frame visible" src="${escape(photo(day,0))}" alt="" loading="lazy"></div><div class="wash"></div><div class="leak"></div><div class="grain"></div><span class="mood-label">${stampSVG(day.imprint.feelings,{title:day.imprint.moodName})}${day.imprint.moodName}</span></div><div class="card-caption"><time datetime="${day.date}">${formatDate(day.date)}</time><h3>${escape(day.imprint.title)}</h3></div></a>
-    `).join('') : '<p class="empty">Ничего не найдено. Попробуйте другое слово или дату.</p>';
+    grid.innerHTML = filtered.length ? filtered.map(day=>{const treat=treatment(day.imprint,'c-'+day.id,.36);return `
+      <a class="day-card" href="${href(day.id)}" aria-label="Открыть день: ${escape(day.imprint.title)}"><div class="thumb"${treat.attr} style="${sceneStyle(day.imprint)}${treat.style}">${treat.svg}<div class="frames"><img class="frame visible" src="${escape(photo(day,0))}" alt="" loading="lazy"></div><div class="wash"></div><div class="leak"></div><div class="grain"></div><span class="mood-label">${stampSVG(day.imprint.feelings,{title:day.imprint.moodName})}${day.imprint.moodName}</span></div><div class="card-caption"><time datetime="${day.date}">${formatDate(day.date)}</time><h3>${escape(day.imprint.title)}</h3></div></a>
+    `;}).join('') : '<p class="empty">Ничего не найдено. Попробуйте другое слово или дату.</p>';
   };
   search.addEventListener('input',update);
   main.querySelector('#export-archive').addEventListener('click', async event=>{
@@ -152,9 +153,13 @@ function framesLine(day) {
 function musicLine(day) {
   const {imprint,music}=day;
   const moved=shifts(imprint.pictured,imprint.feelings);
-  const mode={major:'мажор',minor:'минор'}[music.analysis.mode];
-  return `${music.origin!=='catalog'?'':music.analysis.heard?'Трек из каталога разобран по звуку. ':'Характер трека взят из его описания. '}Темп даёт ${imprint.duration.toLocaleString('ru',{maximumFractionDigits:1})} с на кадр.`
-    + (mode ? ` Лад: ${music.analysis.key} ${mode}.` : (music.kind==='file' && music.origin!=='generated') || music.analysis.heard ? ' Лад не выражен ясно.' : '')
+  const sound=music.analysis;
+  const mode={major:'мажор',minor:'минор'}[sound.mode];
+  const seconds=imprint.duration.toLocaleString('ru',{maximumFractionDigits:1});
+  return `${music.origin!=='catalog'?'':sound.heard?'Трек из каталога разобран по звуку. ':'Характер трека взят из его описания. '}`
+    + (sound.bpm ? `Темп ${sound.bpm} уд/мин: кадр держится восемь долей, это ${seconds} с.` : `Ровного пульса нет, поэтому время кадра, ${seconds} с, взято из энергии трека.`)
+    + ` Энергия ${number(sound.energy)}.`
+    + (mode ? ` Лад: ${sound.key} ${mode}.` : (music.kind==='file' && music.origin!=='generated') || sound.heard ? ' Лад не выражен ясно.' : '')
     + (moved.length ? ` Музыка сдвинула числа: ${moved.join(', ')}.` : ' Числа музыка не сдвинула.');
 }
 
@@ -178,7 +183,7 @@ function renderDay(day, photo, fileURL) {
   main.innerHTML = `
     <div class="day-toolbar"><a class="back" href="#archive">Архив дней</a><div class="day-actions">${day.demo?'':'<button class="plain" id="edit-text" type="button">Изменить текст</button><button class="plain" id="delete-day" type="button">Удалить день</button>'}<button class="plain bordered" id="download" type="button">Скачать папку дня</button></div></div>
     <article aria-labelledby="day-heading">${sceneHTML(day,sources,formatDate(day.date))}
-    <div class="transport"><button class="primary" type="button" id="play" aria-pressed="false">Воспроизвести</button><div class="track"><strong>${escape(music.track)}</strong><span>${music.analysis.bpm ? (music.kind==='link'?'Около ':'')+music.analysis.bpm+' уд/мин':'Свободный ритм'}</span>
+    <div class="transport"><button class="primary" type="button" id="play" aria-pressed="false">Воспроизвести</button><div class="track"><strong>${escape(music.track)}</strong><span>${music.analysis.bpm ? (music.kind==='link'?'Около ':'')+music.analysis.bpm+' уд/мин':'Свободный ритм'}${music.analysis.mode ? ' · '+escape(music.analysis.key)+' '+({major:'мажор',minor:'минор'})[music.analysis.mode] : ''}</span>
       ${music.rights?`<span title="${escape(music.rights.description)}">${escape(music.rights.label)}</span>`:''}</div>
     ${inlineAudio?`<audio controls preload="${music.kind==='remote'?'none':'metadata'}" src="${escape(musicSource)}" aria-label="Песня дня"></audio>`:`<a class="plain bordered" target="_blank" rel="noopener noreferrer" href="${escape(music.url)}">Открыть песню</a>`}</div>
     ${music.origin==='catalog'?`<p class="catalog-links">${escape(music.artist)} · <a href="${escape(music.sourceUrl)}" target="_blank" rel="noopener noreferrer">Страница трека</a> · <a href="${escape(music.licenseUrl)}" target="_blank" rel="noopener noreferrer">${escape(music.license)}</a>. Музыка играет через интернет.</p>`:''}
@@ -225,8 +230,12 @@ function renderDay(day, photo, fileURL) {
   function restyle() {
     day.imprint=makeImprint(day.story,day.photoData,day.music.analysis,day.reading);
     const {imprint}=day;
-    scene.style.cssText=sceneStyle(imprint);
+    const treat=treatment(imprint,'s-'+day.id);
+    scene.style.cssText=sceneStyle(imprint)+treat.style;
     Object.assign(scene.dataset,{face:imprint.face,place:imprint.place,duration:imprint.duration});
+    scene.toggleAttribute('data-treat',Boolean(treat.svg));
+    scene.querySelector('.treat')?.remove();
+    scene.insertAdjacentHTML('afterbegin',treat.svg);
     scene.querySelector('.motif').outerHTML=motifSVG(imprint,day.id);
     scene.querySelector('h1').textContent=imprint.title;
     scene.querySelector('.scene-text p').textContent=imprint.excerpt;
@@ -448,8 +457,8 @@ function paintReadingChoice() {
   document.querySelector('#ai-consent').hidden=!model.available;
   document.querySelector('#reading-hint').textContent=model.available
     ? 'С галочкой при сборке воспоминания текст записи отправится в OpenAI: модель оценит настроение дня и назовёт папку. Без галочки текст останется на устройстве, а настроение оценит встроенный словарь.'
-    : model.server ? 'Настроение дня оценит встроенный словарь на устройстве. Чтобы запись читала модель, подключите ключ OpenAI по инструкции проекта и перезапустите дневник.'
-    : 'Настроение дня оценит встроенный словарь на устройстве: эта версия открыта без сервера, и текст никуда не отправляется.';
+    : model.server && !model.hosted ? 'Настроение дня оценит встроенный словарь на устройстве. Чтобы запись читала модель, подключите ключ OpenAI по инструкции проекта и перезапустите дневник.'
+    : 'Настроение дня оценит встроенный словарь на устройстве: в этой версии текст никуда не отправляется.';
 }
 // Show what is already known at once, then check again in case the key changed.
 async function showReadingChoice() {
@@ -531,7 +540,7 @@ function sortDays() {days.sort((a,b)=>b.date.localeCompare(a.date)||b.created-a.
 // Days saved by an earlier version have no numbers yet: read them on the device once.
 async function upgrade(day) {
   const measured=day.photoData?.every(photo=>photo.warm!=null);
-  if (day.imprint?.v===3 && day.reading?.feelings && measured) return day;
+  if (day.imprint?.v===4 && day.reading?.feelings && measured) return day;
   const photoData=measured ? day.photoData : await Promise.all(day.photos.map(photoStats));
   const reading=day.reading?.feelings ? day.reading : localReading(day.story);
   const next={...day,photoData,reading,imprint:makeImprint(day.story,photoData,day.music.analysis,reading)};
@@ -562,7 +571,8 @@ if (results[2].status==='fulfilled') {
 sortDays();
 if (results[3].status==='fulfilled') model=results[3].value;
 // A copy opened without the local server still keeps a diary, but says plainly what it cannot do.
-if (!model.server) document.querySelector('footer span:last-child').textContent='Версия без сервера: настроение оценивает словарь, генерация картинок и новая озвучка недоступны. Записи хранятся в этом браузере';
+if (model.hosted) document.querySelector('footer span:last-child').textContent=(model.available?'Версия в интернете: запись читает модель, если автор разрешит.':'Версия в интернете: настроение оценивает словарь.')+' Картинки по рассказу и новая озвучка создаются при запуске на компьютере. Записи хранятся в этом браузере';
+else if (!model.server) document.querySelector('footer span:last-child').textContent='Версия без сервера: настроение оценивает словарь, генерация картинок и новая озвучка недоступны. Записи хранятся в этом браузере';
 render();
 if (results.some(result=>result.status==='rejected') || (stored.status==='fulfilled' && stored.value.failed)) announce('Не удалось загрузить часть дневника.');
 window.addEventListener('hashchange',()=>render(true));

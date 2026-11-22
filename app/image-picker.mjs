@@ -12,6 +12,7 @@ export function setupImagePicker(form) {
   const scene = form.querySelector('#image-description');
   const help = form.querySelector('#image-key-help');
   const style = form.querySelector('#image-style');
+  const box = form.querySelector('.image-generator');
   const frames = [];
   let service = null;
   let pending = null;
@@ -93,9 +94,14 @@ export function setupImagePicker(form) {
       if (attempt !== serial) return;
       if (config.provider !== 'openai') throw Error();
       service = config;
+      delete box.dataset.offline;
       help.hidden = config.available;
     } catch {
-      if (attempt === serial) status.textContent='Не удалось подключиться к серверу «Оттиска». Запустите python3 server.py и снова откройте шаг с кадрами.';
+      // A copy on the web has no image generator: say what works here instead of reporting a fault.
+      if (attempt === serial) {
+        box.dataset.offline='';
+        status.textContent='Картинки по рассказу создаёт версия, запущенная на компьютере с ключом OpenAI. Здесь добавьте свои фотографии.';
+      }
     } finally { if (attempt === serial) refreshCapacity(); }
   }
 
