@@ -5,10 +5,12 @@
     "api/mood_semantic.py": {"includeFiles": "mood-server/semantic/**", "excludeFiles": "{app,public}/**", "maxDuration": 60},
     "api/music.py": {"excludeFiles": "{app,public,mood-server}/**", "maxDuration": 60},
     "api/reading.py": {"excludeFiles": "{app,public,mood-server}/**", "maxDuration": 60},
+    "api/image.py": {"excludeFiles": "{app,public,mood-server}/**", "maxDuration": 60},
     "api/mood.mjs": {"includeFiles": "{mood-server,app}/**", "excludeFiles": "{public,mood-server/semantic}/**", "maxDuration": 60}
   },
   "rewrites": [
     {"source": "/api/reading/status", "destination": "/api/reading"},
+    {"source": "/api/image/status", "destination": "/api/image"},
     {"source": "/api/music/audio", "destination": "/api/music"}
   ],
   "headers": [

@@ -126,8 +126,11 @@ export function setupImagePicker(form) {
       if (!response.ok) throw Error();
       const config = await response.json();
       if (attempt !== serial) return;
-      if (config.provider !== 'openai') throw Error();
+      // On the published site a visitor cannot connect a key: without one only photographs are offered.
+      if (config.provider !== 'openai' || (config.hosted && !config.available)) throw Error();
       service = config;
+      // On the published site the frame is paid for by the site's owner, not by the visitor.
+      if (config.hosted) form.querySelector('#image-provider').textContent=t('По кнопке «Создать изображение» в OpenAI отправятся описание из этого поля и выбранный стиль.');
       delete box.dataset.offline;
       help.hidden = config.available;
     } catch {
