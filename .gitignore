@@ -1,0 +1,9 @@
+.image-runtime/
+__pycache__/
+.voice-runtime/
+.ottisk-secrets/
+.claude/
+my-day/
+# Built by tools/package.py from the files in this repository.
+ottisk-submission.zip
+submission/ottisk-source.zip

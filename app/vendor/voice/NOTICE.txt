@@ -1,0 +1,18 @@
+Russian speech recognition in Ottisk
+
+Vosk Browser 0.0.8, Ciaran O'Reilly / vosk-browser contributors
+https://github.com/ccoreilly/vosk-browser
+Distribution: https://registry.npmjs.org/vosk-browser/-/vosk-browser-0.0.8.tgz
+SHA-256 of upstream package: fd16fc7e64c935d7a79cf07c8f67d84232b6485376a59144af8a234979a9a4b4
+Unmodified browser bundle (JavaScript, WebAssembly and worker). Apache License 2.0.
+
+Russian acoustic and language model: vosk-model-small-ru-0.22, Alpha Cephei.
+https://alphacephei.com/vosk/models
+Distribution: https://alphacephei.com/vosk/models/vosk-model-small-ru-0.22.zip
+SHA-256 of upstream ZIP: 961d5ff98a17f4aa6de69864d0aa71fa5bac682301d2b5d17a3f24c5c99a46d4
+Repackaged as model/ within a gzip-compressed tar archive for vosk-browser;
+model files and upstream README are unchanged. Apache License 2.0.
+
+License text: Apache-2.0.txt.
+
+The browser bundle uses uuid 9.0.0, MIT license (uuid-LICENSE.txt).

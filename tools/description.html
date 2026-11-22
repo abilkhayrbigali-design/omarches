@@ -1,0 +1,87 @@
+<!doctype html>
+<!-- One-page project description for the submission.
+     Build: chromium --headless --no-pdf-header-footer --print-to-pdf=submission/ottisk-description.pdf tools/description.html
+     The mark in the header is the imprint of the six example days. -->
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Оттиск — личный дневник ощущений</title>
+<style>
+  @font-face{font-family:"Noto Serif";src:url("../app/media/title.woff2") format("woff2")}
+  @font-face{font-family:"Adwaita Sans";src:url("../app/media/sans.woff2") format("woff2");font-weight:100 900}
+  @page{size:A4;margin:0}
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  html{height:297mm;overflow:hidden}
+  body{position:relative;width:210mm;height:296mm;overflow:hidden;font:9.1pt/1.45 "Adwaita Sans",sans-serif;color:#22241c;background:#f3f2e8;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact}
+  h1,h2{font-family:"Noto Serif",serif;font-weight:400;margin:0}
+  p{margin:0}
+  header{position:relative;background:#191b16;color:#f3f0df;padding:11mm 16mm 8.5mm}
+  .event{font-size:8.6pt;font-weight:560;letter-spacing:.02em;color:#e8eea3}
+  h1{font-size:40pt;letter-spacing:-.04em;line-height:1;margin:4.5mm 0 2.5mm}
+  .deck{font-size:12.5pt;color:#e9e6d4}
+  .case{font-size:9.1pt;color:#b9bba6;margin-top:1.4mm}
+  .mark{position:absolute;right:19mm;top:9mm;width:28mm;height:28mm;color:#b9bba6}
+  .mark .guide{fill:none;stroke:currentColor;stroke-width:.6;opacity:.45}
+  .mark .shape{fill:#e8eea3}
+  .mark-note{position:absolute;right:13mm;top:38.5mm;width:40mm;text-align:center;font-size:7.2pt;letter-spacing:.01em;color:#b9bba6}
+  main{padding:6.5mm 16mm 0}
+  section{margin-bottom:4.4mm}
+  h2{font-size:15.5pt;letter-spacing:-.02em;line-height:1.15;margin-bottom:1.3mm}
+  section>p{max-width:172mm}
+  .rule{border-top:.3mm solid #d7d6c8;padding-top:4.4mm}
+  table{border-collapse:collapse;width:100%;margin-top:2mm}
+  td{padding:1.1mm 0;border-top:.25mm solid #dcdbcd;vertical-align:baseline}
+  td:first-child{width:47mm;font-family:"Noto Serif",serif;font-size:10pt;white-space:nowrap}
+  td:nth-child(2){width:33mm;font-weight:560}
+  dl{margin:1.8mm 0 0;display:grid;grid-template-columns:20mm 1fr;gap:1.5mm 0}
+  dt{font-weight:620}
+  dd{margin:0}
+  footer{position:absolute;left:16mm;right:16mm;bottom:8mm;border-top:.3mm solid #d7d6c8;padding-top:2.6mm;font-size:8pt;letter-spacing:.01em;color:#5b5d50}
+</style>
+</head>
+<body>
+<header>
+  <p class="event">Genesis Hackathon · ArtTech</p>
+  <h1>Оттиск</h1>
+  <p class="deck">Личный дневник ощущений</p>
+  <p class="case">Make the Invisible Visible</p>
+  <svg class="mark" viewBox="-50 -50 100 100" aria-hidden="true"><g class="guide"><circle r="46"/><line x1="0" y1="-46" x2="0" y2="46"/><line x1="32.5" y1="-32.5" x2="-32.5" y2="32.5"/><line x1="46" y1="0" x2="-46" y2="0"/><line x1="32.5" y1="32.5" x2="-32.5" y2="-32.5"/></g><path class="shape" d="M0.0 -23.1C4.7 -21.9 8.1 -14.7 10.8 -10.8C13.5 -7.0 15.3 -4.3 16.0 0.0C16.7 4.3 17.7 12.9 15.0 15.0C12.3 17.1 5.9 11.8 0.0 12.7C-5.9 13.6 -15.7 22.3 -20.2 20.2C-24.8 18.1 -27.6 6.3 -27.1 0.0C-26.7 -6.3 -22.1 -13.8 -17.6 -17.6C-13.1 -21.5 -4.7 -24.2 0.0 -23.1Z"/></svg>
+  <p class="mark-note">оттиск шести дней из примеров</p>
+</header>
+<main>
+  <section>
+    <h2>Идея и аудитория</h2>
+    <p>Через месяцы фотография напоминает, как выглядел день. «Оттиск» возвращает то, как он ощущался. Дневник для людей, которые снимают повседневность, сохраняют песни и хотят снова увидеть и услышать значимый день.</p>
+  </section>
+  <section>
+    <h2>От записи к воспоминанию</h2>
+    <p>Автор пишет или надиктовывает рассказ, добавляет фотографии и песню: свой файл, ссылку или трек из Openverse с автором и лицензией. Дневник собирает из них сцену с музыкой, сам называет папку дня и складывает в неё текст, кадры, песню, сцену и озвучку. В архиве любой день можно открыть, пересмотреть и послушать: голос и темп чтения дневник подбирает по настроению дня.</p>
+  </section>
+  <section class="rule">
+    <h2>Восемь чисел вместо одного ярлыка</h2>
+    <p>Настроение дня — восемь чисел от 0 до 1 в четырёх парах противоположностей. Каждая пара управляет своим слоем оформления, поэтому смешанный день не усредняется: грустный, но шумный вечер будет тёмным по цвету и быстрым по движению. Цвет сцены берётся от ведущего чувства, акцент — от второго по силе.</p>
+    <table>
+      <tr><td>Радость ↔ Грусть</td><td>Свет и цвет</td><td>светлота, насыщенность, тень по краям</td></tr>
+      <tr><td>Покой ↔ Напряжение</td><td>Форма</td><td>углы, шрифт заголовка, сетка, резкость склеек</td></tr>
+      <tr><td>Праздник ↔ Тишина</td><td>Движение</td><td>скорость, размер заголовка, световые следы</td></tr>
+      <tr><td>Тепло ↔ Уединение</td><td>Фактура и воздух</td><td>засветка, зерно, поля вокруг кадра</td></tr>
+    </table>
+  </section>
+  <section>
+    <h2>Как материал меняет оформление</h2>
+    <dl>
+      <dt>Текст</dt><dd>Языковая модель читает запись и возвращает числа, название папки и одну фразу с объяснением. Автор сам решает, отправлять ли ей текст; без неё работает словарь на устройстве. Числа можно поправить ползунками.</dd>
+      <dt>Кадры</dt><dd>Оттенок фотографий смешивается с цветом ведущего чувства, светлота влияет на подложку и зерно. Тёплые или холодные цвета, плотность и свет кадра слегка сдвигают числа.</dd>
+      <dt>Музыка</dt><dd>Темп задаёт время кадра. Энергия и лад (мажор или минор) сдвигают пары «Праздник ↔ Тишина» и «Радость ↔ Грусть», а через них скорость переходов, контраст и насыщенность.</dd>
+    </dl>
+  </section>
+  <section class="rule">
+    <h2>Один дневник</h2>
+    <p>Постоянны сетка, место даты и подписи, два шрифта с ролями и оттиск — знак из восьми лучей, где противоположные чувства стоят напротив. Меняется всё остальное, и не только в сцене: на странице дня весь сайт принимает её оформление, а главная страница считается по всем дням. Каждая запись сдвигает числа дневника понемногу, и чувство, которое вело день, теснит свою противоположность: после грустного дня радости становится чуть меньше, а грусти больше.</p>
+  </section>
+</main>
+<footer>Дневник хранит записи в браузере. В архиве шесть вымышленных историй с оригинальной музыкой и готовой озвучкой. Числа описывают текст записи, а не состояние автора.</footer>
+</body>
+</html>

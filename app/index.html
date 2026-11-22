@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Оттиск — личный дневник, который сохраняет атмосферу дня.">
+  <meta name="theme-color" content="#191b16">
+  <title>Оттиск — личный дневник</title>
+  <link rel="stylesheet" href="./style.css">
+  <script type="module" src="./main.mjs"></script>
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="#" aria-label="Оттиск, архив"><span class="mark" id="brand-mark" aria-hidden="true"></span> Оттиск<span class="brand-note">Личный дневник</span></a>
+    <nav aria-label="Разделы"><a class="nav-link" href="#archive">Архив</a><button class="primary" id="compose">Записать день</button></nav>
+  </header>
+  <main id="main" tabindex="-1"></main>
+  <dialog id="editor" aria-labelledby="editor-title">
+    <form id="day-form" novalidate>
+      <div class="dialog-top"><div><p class="eyebrow" id="step-count" aria-live="polite">Шаг 1 из 3</p><h2 id="editor-title" tabindex="-1">Каким был день?</h2></div><button type="button" class="plain close" id="close-editor" aria-label="Закрыть">×</button></div>
+      <section data-step="1">
+      <label>Дата <input name="date" type="date" required></label>
+      <label>Текст дня <textarea name="story" placeholder="Где вы были? Какими были свет, звуки и люди рядом?" required maxlength="6000" rows="4"></textarea></label>
+      <button type="button" id="dictate-story" class="plain bordered">Надиктовать день</button>
+      <p id="dictation-status" class="hint" role="status"></p>
+      <label class="check" id="ai-consent" hidden><input type="checkbox" name="useAI" checked> Прочитать запись с помощью ИИ</label>
+      <p class="hint" id="reading-hint"></p>
+      </section>
+      <section data-step="2" hidden>
+      <label>Фотографии <input name="photos" type="file" accept="image/*" multiple aria-describedby="photo-help"></label>
+      <p class="hint" id="photo-help">Можно загрузить фотографии и добавить иллюстрации по рассказу. Всего до 12 кадров, каждый до 20 МБ.</p>
+      <div id="photo-strip" aria-label="Кадры дня"></div>
+      <fieldset class="image-generator">
+        <legend>Изображение по рассказу</legend>
+        <label>Описание для OpenAI <textarea id="image-description" maxlength="6000" rows="3"></textarea></label>
+        <p class="hint" id="image-provider">По кнопке «Создать изображение» в OpenAI отправятся описание из этого поля и выбранный стиль. Генерация оплачивается с вашего API-аккаунта.</p>
+        <div id="image-key-help" hidden>
+          <p class="hint">Для генерации нужен <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer">ключ OpenAI API</a>. В терминале проекта выполните <code>python3 server.py --set-image-key</code>.</p>
+          <button type="button" class="plain bordered" id="check-image-settings">Проверить настройки</button>
+        </div>
+        <div class="image-options"><label>Стиль <select id="image-style"><option value="cinematic natural-light photograph, fine film grain">Плёночное фото</option><option value="watercolor on textured paper, soft transparent washes">Акварель</option><option value="color linocut print, graphic silhouettes and carved ink lines">Цветная линогравюра</option></select></label>
+        <button type="button" class="plain bordered" id="generate-image" disabled>Создать изображение</button></div>
+        <p class="hint" id="image-status" role="status"></p>
+        <div id="image-review" hidden><img id="generated-image" alt="Иллюстрация, созданная по рассказу о дне"><button type="button" class="plain bordered" id="accept-image">Добавить к кадрам</button></div>
+      </fieldset>
+      </section>
+      <section data-step="3" hidden>
+      <fieldset class="music-field"><legend class="sr-only">Песня дня</legend>
+        <div class="choice"><label><input type="radio" name="musicType" value="assist" checked> Из интернета</label><label><input type="radio" name="musicType" value="file"> Аудиофайл</label><label><input type="radio" name="musicType" value="link"> Ссылка</label><label><input type="radio" name="musicType" value="generate"> Сочинить</label></div>
+        <div id="music-assist">
+          <p class="hint" id="query-reason"></p>
+          <p id="music-progress" class="music-progress" role="status"></p>
+          <div id="catalog-player" hidden>
+            <strong id="preview-title"></strong>
+            <audio id="music-preview" controls preload="none" aria-label="Послушать выбранный трек"></audio>
+            <p class="hint" id="catalog-credit"></p>
+          </div>
+          <div id="music-picks" role="radiogroup" aria-label="Треки из интернета"></div>
+          <button type="button" class="plain bordered" id="music-more" hidden>Ещё треки</button>
+          <p class="hint music-terms"><a href="https://openverse.org/" target="_blank" rel="noopener noreferrer">Поиск Openverse</a> · «Оттиск» — независимый проект без сертификации Openverse.</p>
+        </div>
+        <div id="music-generate-panel" hidden>
+          <p class="hint">Инструментальная мелодия по настроению рассказа. Её можно бесплатно публиковать в составе воспоминания.</p>
+          <button type="button" class="plain bordered" id="music-generate">Сочинить мелодию</button>
+          <p class="hint" role="status" id="generated-status"></p>
+          <audio controls preload="none" id="generated-preview" aria-label="Послушать сочинённую мелодию" hidden></audio>
+        </div>
+        <div id="music-file" hidden><label>Аудиофайл <input name="audio" type="file" accept="audio/*"></label><p class="hint">Используйте собственное аудио или музыку со свободной лицензией, до 25 МБ.</p></div>
+        <div id="music-link" hidden>
+          <label>Ссылка на трек <input name="url" type="url" placeholder="https://…"></label>
+          <label>Исполнитель и название <input name="track" maxlength="150" placeholder="Исполнитель — Песня"></label>
+          <div class="paired"><label>Темп <select name="tempo"><option value="">Выберите темп</option><option value="68">Медленный</option><option value="100">Средний</option><option value="144">Быстрый</option></select></label>
+          <label>Характер <select name="character"><option value="">Выберите характер</option><option value="soft">Мягкая</option><option value="driving">Драйвовая</option><option value="wistful">Меланхоличная</option><option value="bright">Светлая</option></select></label></div>
+          <p class="hint">Темп и характер зададут ритм и обработку сцены. Трек откроется на музыкальном сервисе.</p>
+        </div>
+      </fieldset>
+      </section>
+      <p class="error" role="alert" id="form-error" hidden></p>
+      <div class="form-bottom wizard-actions"><button type="button" class="plain bordered" id="previous-step" hidden>Назад</button><button type="button" class="primary" id="next-step">Добавить фотографии</button><button class="primary" type="submit" hidden>Собрать воспоминание</button></div>
+    </form>
+  </dialog>
+  <dialog id="confirm" aria-labelledby="confirm-title">
+    <form method="dialog">
+      <h2 id="confirm-title"></h2>
+      <p id="confirm-text"></p>
+      <div class="form-bottom"><button class="plain bordered" value="cancel">Оставить</button><button class="primary danger" value="ok">Удалить</button></div>
+    </form>
+  </dialog>
+  <div id="status" class="toast" role="status" hidden></div>
+  <footer><span>Оттиск</span><span>Личный архив хранится в этом браузере</span></footer>
+</body>
+</html>
