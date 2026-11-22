@@ -17,7 +17,7 @@ export const feelingName = id => BY_ID.get(id).name;
 
 // Each pair owns one layer of the design, so mixed days never fight over the same control.
 export const PAIRS = [
-  {a:'joy', b:'sadness', layer:'Свет и цвет', more:'светлее и насыщеннее', less:'темнее и приглушённее'},
+  {a:'joy', b:'sadness', layer:'Свет и цвет', more:'светлее и насыщеннее', less:'темнее, глуше, тени в серой дымке'},
   {a:'calm', b:'tension', layer:'Форма', more:'мягкие углы и шрифт с засечками', less:'острые углы, сетка и рубленый шрифт'},
   {a:'festive', b:'quiet', layer:'Движение', more:'быстрее, крупнее, со световыми следами', less:'медленнее и почти неподвижно'},
   {a:'warmth', b:'solitude', layer:'Фактура и воздух', more:'тёплая засветка и плёночное зерно', less:'холодные поля вокруг кадра'}
@@ -174,8 +174,10 @@ export function localReading(story) {
 export function withMusic(text, audio) {
   const energy = clamp(audio?.energy ?? .5);
   const tone = clamp(audio?.tone ?? 0, -1, 1);
-  const heard = {festive: Math.max(0, (energy - .5) * 2), quiet: Math.max(0, (.5 - energy) * 2),
-    joy: Math.max(0, tone), sadness: Math.max(0, -tone)};
+  const heard = {festive: Math.max(0, (energy - .5) * 2), quiet: Math.max(0, (.5 - energy) * 2)};
+  // When the key could not be told (tone 0) the song says nothing about light,
+  // so joy and sadness stay as the text gave them instead of shrinking towards zero.
+  if (tone) Object.assign(heard, {joy: Math.max(0, tone), sadness: Math.max(0, -tone)});
   const result = {...text};
   for (const [id, value] of Object.entries(heard)) result[id] = round2(clamp(text[id] + .25 * (value - text[id])));
   return result;
@@ -252,12 +254,26 @@ export function feelingLabel(feelings, keep = null, keepSecond = null) {
   return second ? `${feelingName(lead)} и ${feelingName(second).toLowerCase()}` : feelingName(lead);
 }
 
-function accentFor(feelings, lead, second) {
-  const source = BY_ID.get(second || lead);
+// Calm is the absence of a pull, and it already owns the form. When it leads, the
+// colour comes from the feeling beside it: a calm rainy day is grey, a calm day
+// alone by the water is cold, a calm evening together is amber. Without this every
+// quiet day turned the same mint green.
+function colourSource(lead, second) {
+  if (lead === 'calm') return {colour: second || lead, other: second ? lead : null};
+  return {colour: lead, other: second};
+}
+
+// The accent is the other feeling seen in the light of the scene: its hue leans a
+// third of the way towards the scene colour. Calm brings no second colour either,
+// so a calm day is drawn in one colour, its accent a lighter tone of the scene.
+function accentFor(feelings, lead, second, sceneHue) {
+  const {colour, other} = colourSource(lead, second);
+  const source = BY_ID.get(other && other !== 'calm' ? other : colour);
   if (!source) return {accentHue: 65, accentSat: 69, accentLight: 79};
-  const red = source.hue >= 320 || source.hue <= 20;
-  return {accentHue: source.hue, accentSat: Math.round(clamp(source.sat + 14, 38, 86)),
-    accentLight: red ? 70 : source.hue > 30 && source.hue < 70 ? 78 : 76};
+  const hue = sceneHue == null ? source.hue : Math.round(hueBlend(source.hue, sceneHue, .35));
+  const red = hue >= 320 || hue <= 20;
+  return {accentHue: hue, accentSat: Math.round(clamp(source.sat + 14, 38, 86)),
+    accentLight: red ? 70 : hue > 30 && hue < 70 ? 78 : 76};
 }
 
 // Shared by the scene and by the site: shape and type come from the same numbers.
@@ -281,7 +297,7 @@ export function sceneTokens(feelings, photo, audio) {
   const strength = lead ? f[lead] : 0;
   const valence = f.joy - f.sadness;
   const press = f.tension - f.calm;
-  const anchor = lead ? BY_ID.get(lead) : {hue: NEUTRAL_HUE, sat: 14};
+  const anchor = lead ? BY_ID.get(colourSource(lead, second).colour) : {hue: NEUTRAL_HUE, sat: 14};
   const energy = clamp(audio?.energy ?? .5);
   const tone = clamp(audio?.tone ?? 0, -1, 1);
   const drive = clamp(.35 * (f.festive - f.quiet + 1) / 2 + .65 * energy);
@@ -291,9 +307,16 @@ export function sceneTokens(feelings, photo, audio) {
   const place = form.face === 'grotesk' ? 'grid'
     : (f.solitude >= .5 || (f.quiet >= .7 && f.warmth < .5)) && f.festive < .4 ? 'air'
     : f.festive >= .55 ? 'burst' : 'base';
+  // The photograph lends the scene its hue, less so on two kinds of day. Sadness drains
+  // the frame's own colour and leaves the colour of the feeling. Solitude works like
+  // aerial perspective: far things take the cold colour of the air between.
+  // A frame whose colour is far from the feeling's lends less: blue pulled halfway to
+  // orange would pass through green, a colour neither the day nor the photo had.
+  const apart = Math.abs(((photo.hue - anchor.hue + 540) % 360) - 180) / 180;
+  const lend = Math.min(.6, photo.weight * 3.2) * (1 - apart) * (1 - .6 * f.sadness) * (1 - .5 * f.solitude);
+  const hue = Math.round(hueBlend(anchor.hue, photo.hue, lend));
   return {
-    lead, second, place, ...form, ...accentFor(f, lead, second),
-    hue: Math.round(hueBlend(anchor.hue, photo.hue, Math.min(.6, photo.weight * 3.2))),
+    lead, second, place, ...form, ...accentFor(f, lead, second, hue), hue,
     saturation: Math.round(clamp(anchor.sat * (.45 + .55 * strength) * .7 + photo.sat * .3 + tone * 8 + valence * 8, 10, 80)),
     dark: Math.round(clamp(12 + (photo.light - 45) * .1 + valence * 4, 7, 22)),
     wash: round2(.08 + .2 * strength),
@@ -302,6 +325,9 @@ export function sceneTokens(feelings, photo, audio) {
     filterSat: round2(clamp(.95 + .35 * f.joy + .3 * f.festive - .4 * f.sadness - .25 * f.solitude - .15 * f.quiet + tone * .08, .45, 1.5)),
     sepia: round2(clamp(.38 * f.warmth - .2 * f.tension, 0, .4)),
     bright: round2(clamp(1 + .07 * f.joy - .1 * f.sadness, .86, 1.1)),
+    // Sadness lifts the blacks into a slate haze, like a print left in the sun:
+    // the day is not darker so much as further away. Joy keeps the shadows deep.
+    matte: round2(clamp(f.sadness - .5 * f.joy)),
     inset: round2(clamp(f.solitude * 7 + f.quiet * 3 - f.festive * 4 - f.warmth * 3, 0, 9)),
     tilt: round2(f.festive > .5 ? -(f.festive - .5) * 3 : 0),
     energy: round2(drive), duration: round2(duration),
@@ -323,11 +349,12 @@ export function siteTokens(feelings, {hue, keep, keepSecond} = {}) {
   const f = feelings;
   const {lead, second} = ranking(f, keep, keepSecond);
   const strength = lead ? f[lead] : 0;
-  const anchor = lead ? BY_ID.get(lead) : {hue: NEUTRAL_HUE, sat: 30};
+  const anchor = lead ? BY_ID.get(colourSource(lead, second).colour) : {hue: NEUTRAL_HUE, sat: 30};
   const form = formTokens(f);
+  const base = Math.round(hue ?? anchor.hue);
   return {
-    lead, second, ...form, ...accentFor(f, lead, second),
-    hue: Math.round(hue ?? anchor.hue),
+    lead, second, ...form, ...accentFor(f, lead, second, base),
+    hue: base,
     paperSat: Math.round(clamp(anchor.sat * .34 * (.4 + .6 * strength), 6, 24)),
     paperLight: round2(clamp(9.5 + 3 * f.joy - 3 * f.sadness + 1.5 * f.warmth - 1.5 * f.tension, 6, 14)),
     glow: round2(.08 + .24 * strength),
