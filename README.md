@@ -38,7 +38,7 @@ Genesis Hackathon 2026 · ArtTech · Make the Invisible Visible
 | Материал | Где смотреть |
 |---|---|
 | Прототип | [ottisk-eta.vercel.app](https://ottisk-eta.vercel.app/) · [запасная копия на GitHub Pages](https://abilkhayrbigali-design.github.io/omarches/) |
-| Видео до трёх минут | 1:57, лежит в папке сдачи. В ролике настоящие фотографии людей, поэтому в открытый репозиторий он не входит |
+| Видео до трёх минут | 1:13, лежит в папке сдачи. В ролике настоящие фотографии людей, поэтому в открытый репозиторий он не входит |
 | Примеры дней | [Семь дней с названиями папок](submission/examples/README.md) · [интерактивный архив](submission/examples/ottisk-examples.zip) |
 | Описание на одной странице | [ottisk-description.pdf](submission/ottisk-description.pdf) |
 | Художественные приёмы | [techniques.md](submission/techniques.md) |
