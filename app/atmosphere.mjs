@@ -1,4 +1,5 @@
 import {cleanFeelings, feelingLabel, localReading, localTitle, sceneTokens, withMusic, withPhotos} from './feelings.mjs';
+import {readContext} from './context.mjs';
 
 const clamp = (x, min, max) => Math.min(max, Math.max(min, x));
 const mean = numbers => numbers.reduce((sum, n) => sum+n, 0)/numbers.length;
@@ -202,7 +203,7 @@ export async function audioStats(file) {
 // Text gives the eight numbers. Photographs lean them by the warmth, density and light of
 // the frames, then music nudges pace and brightness. The photo also gives the scene its hue.
 // `reading` is {feelings, title, ...} from the language model or from the dictionary on the device.
-export function makeImprint(story, photos, audio, reading) {
+export function makeImprint(story, photos, audio, reading, date) {
   if (!story.trim() || !photos.length) throw Error('Добавьте текст и хотя бы один кадр.');
   const read = reading?.feelings ? reading : localReading(story);
   const text = cleanFeelings(read.feelings);
@@ -214,7 +215,7 @@ export function makeImprint(story, photos, audio, reading) {
   const caption = [...sentences].sort((a,b)=>Math.abs(a.length-83)-Math.abs(b.length-83))[0];
   const excerpt = caption.length > 152 ? caption.slice(0,148).replace(/\s+\S*$/u,'')+'…' : caption;
   return {
-    v:4, title:String(read.title || '').trim() || localTitle(story), excerpt, text, pictured, feelings, moodName:feelingLabel(feelings),
+    v:5, context:readContext(story, date), title:String(read.title || '').trim() || localTitle(story), excerpt, text, pictured, feelings, moodName:feelingLabel(feelings),
     light, photoHue:Math.round(photo.hue), photoSat:Math.round(photo.sat), ...sceneTokens(feelings, {...photo, light}, audio)
   };
 }

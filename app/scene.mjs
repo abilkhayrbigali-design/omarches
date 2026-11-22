@@ -1,6 +1,7 @@
 // Markup for a memory, built only from strings so the page and the exported
 // folder draw a day in exactly the same way.
 import {FEELINGS, IDS, PAIRS, clamp, feelingName, opposite} from './feelings.mjs';
+import {contextRules, contextSVG} from './context.mjs';
 
 export const escape = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 export const number = value => Number(value).toFixed(2).replace('.', ',');
@@ -228,7 +229,7 @@ export function motifSVG(imprint, seed) {
 }
 
 export const layersHTML = (imprint, seed, {motif = true} = {}) =>
-  `<div class="wash"></div><div class="leak"></div>${motif ? motifSVG(imprint, seed) : ''}<div class="scrim"></div><div class="grain"></div>`;
+  `<div class="wash"></div><div class="leak"></div>${motif ? motifSVG(imprint, seed) + contextSVG(imprint.context, imprint, seed) : ''}<div class="scrim"></div><div class="grain"></div>`;
 
 export function sceneHTML(day, sources, dateText, heading = 'h1') {
   const i = day.imprint;
@@ -288,7 +289,9 @@ export function rulesHTML(imprint) {
   say('quiet', 'мало движения, заголовок меньше, графика приглушена');
   say('warmth', 'тёплая засветка и плёночное зерно');
   say('solitude', 'поля вокруг кадра, линия горизонта, холоднее цвет');
-  if (!rules.length) return '<p class="hint">Ярких чувств в записи не нашлось, поэтому сцена оформлена нейтрально.</p>';
+  // What the entry is about (a holiday, the weather) is listed after what it felt like.
+  const signs = contextRules(imprint.context).map(rule => `<li><b>${escape(rule.label)}</b> ${escape(rule.text)}</li>`).join('');
+  if (!rules.length && !signs) return '<p class="hint">Ярких чувств в записи не нашлось, поэтому сцена оформлена нейтрально.</p>';
   return `<ul class="rules">${rules.sort((a, b) => f[b[0]] - f[a[0]]).map(([id, text]) =>
-    `<li><b>${feelingName(id)} ${number(f[id])}</b> ${text}</li>`).join('')}</ul>`;
+    `<li><b>${feelingName(id)} ${number(f[id])}</b> ${text}</li>`).join('')}${signs}</ul>`;
 }

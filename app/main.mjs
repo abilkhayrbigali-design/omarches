@@ -6,7 +6,8 @@ import {setupMusicPicker} from './music-picker.mjs';
 import {setupImagePicker} from './image-picker.mjs';
 import {setupVoiceEntry} from './voice-entry.mjs';
 import {downloadArchive, downloadDay} from './export.mjs';
-import {IDS, emptyFeelings, feelingLabel, feelingName, foldDiary, localReading, siteTokens} from './feelings.mjs';
+import {IDS, emptyFeelings, feelingLabel, feelingName, foldDiary, siteTokens} from './feelings.mjs';
+import {contextPageHTML, contextSVG} from './context.mjs';
 import {escape, layersHTML, motifSVG, number, pairsHTML, rulesHTML, sceneHTML, sceneStyle, stampSVG, themeVars, treatment, tuneHTML} from './scene.mjs';
 import {readStory, readingStatus} from './reading.mjs';
 
@@ -113,7 +114,7 @@ function renderArchive(photo) {
     const unit = {one:'запись',few:'записи',many:'записей'}[new Intl.PluralRules('ru').select(filtered.length)];
     main.querySelector('#count').textContent=`${filtered.length} ${unit}`;
     grid.innerHTML = filtered.length ? filtered.map(day=>{const treat=treatment(day.imprint,'c-'+day.id,.36);return `
-      <a class="day-card" href="${href(day.id)}" aria-label="Открыть день: ${escape(day.imprint.title)}"><div class="thumb"${treat.attr} style="${sceneStyle(day.imprint)}${treat.style}">${treat.svg}<div class="frames"><img class="frame visible" src="${escape(photo(day,0))}" alt="" loading="lazy"></div><div class="wash"></div><div class="leak"></div><div class="grain"></div><span class="mood-label">${stampSVG(day.imprint.feelings,{title:day.imprint.moodName})}${day.imprint.moodName}</span></div><div class="card-caption"><time datetime="${day.date}">${formatDate(day.date)}</time><h3>${escape(day.imprint.title)}</h3></div></a>
+      <a class="day-card" href="${href(day.id)}" aria-label="Открыть день: ${escape(day.imprint.title)}"><div class="thumb"${treat.attr} style="${sceneStyle(day.imprint)}${treat.style}">${treat.svg}<div class="frames"><img class="frame visible" src="${escape(photo(day,0))}" alt="" loading="lazy"></div><div class="wash"></div><div class="leak"></div>${contextSVG(day.imprint.context,day.imprint,day.id,.36)}<div class="grain"></div><span class="mood-label">${stampSVG(day.imprint.feelings,{title:day.imprint.moodName})}${day.imprint.moodName}</span></div><div class="card-caption"><time datetime="${day.date}">${formatDate(day.date)}</time><h3>${escape(day.imprint.title)}</h3></div></a>
     `;}).join('') : '<p class="empty">Ничего не найдено. Попробуйте другое слово или дату.</p>';
   };
   search.addEventListener('input',update);
@@ -130,10 +131,11 @@ function renderArchive(photo) {
 function sourceLine(day) {
   const reading=day.reading;
   const who=reading.source==='ai' ? `Запись прочитала модель ${escape(reading.model)}.`
+    : reading.source==='own' ? 'Запись прочитала модель «Оттиска» на этом устройстве.'
     : reading.source==='manual' ? 'Числа поправлены вручную.'
     : reading.fallback ? 'Модель не ответила, поэтому настроение оценил словарь на устройстве.'
     : 'Настроение оценил словарь на устройстве.';
-  return `${who}${reading.source==='ai' && reading.reason ? ' '+escape(reading.reason) : ''}`;
+  return `${who}${['ai','own'].includes(reading.source) && reading.reason ? ' '+escape(reading.reason) : ''}`;
 }
 
 // Which numbers moved between two readings of the same day, largest first.
@@ -201,7 +203,7 @@ function renderDay(day, photo, fileURL) {
         <div><dt>Музыка</dt><dd id="music-line"></dd></div></dl>
         <p class="hint">${day.demo?'Это пример: правки чисел действуют до перезагрузки страницы. ':''}Числа описывают текст записи, а не состояние автора.</p>
       </section></div>
-    </article>`;
+    </article>${contextPageHTML(day.imprint.context,day.imprint)}`;
 
   const scene = main.querySelector('.memory');
   const frames = [...scene.querySelectorAll('.frame')];
@@ -228,7 +230,7 @@ function renderDay(day, photo, fileURL) {
     reread.hidden=!model.available || day.reading.source==='ai';
   }
   function restyle() {
-    day.imprint=makeImprint(day.story,day.photoData,day.music.analysis,day.reading);
+    day.imprint=makeImprint(day.story,day.photoData,day.music.analysis,day.reading,day.date);
     const {imprint}=day;
     const treat=treatment(imprint,'s-'+day.id);
     scene.style.cssText=sceneStyle(imprint)+treat.style;
@@ -331,8 +333,8 @@ function renderDay(day, photo, fileURL) {
     if (story===day.story) { editing(false); return; }
     // New words are read on the device; the model reads them only when the author presses its button.
     day.story=story;
-    day.reading=localReading(story);
-    day.imprint=makeImprint(story,day.photoData,day.music.analysis,day.reading);
+    day.reading=await readStory(story,false);
+    day.imprint=makeImprint(story,day.photoData,day.music.analysis,day.reading,day.date);
     day.voiceRecording=null;
     await keep();
     await saveRecording(day.id,null).catch(()=>{});
@@ -516,7 +518,7 @@ form.addEventListener('submit',async event=>{
     if (askModel) submit.textContent='Читаем запись…';
     const reading=await readStory(story,askModel);
     const day={id:crypto.randomUUID(),date:data.get('date'),story,photos,photoData,frameOrigins:imagePicker.origins(),music,reading,
-      imprint:makeImprint(story,photoData,music.analysis,reading),created:Date.now()};
+      imprint:makeImprint(story,photoData,music.analysis,reading,data.get('date')),created:Date.now()};
     await saveDay(day);
     days.push(day);
     sortDays();
@@ -540,10 +542,10 @@ function sortDays() {days.sort((a,b)=>b.date.localeCompare(a.date)||b.created-a.
 // Days saved by an earlier version have no numbers yet: read them on the device once.
 async function upgrade(day) {
   const measured=day.photoData?.every(photo=>photo.warm!=null);
-  if (day.imprint?.v===4 && day.reading?.feelings && measured) return day;
+  if (day.imprint?.v===5 && day.reading?.feelings && measured) return day;
   const photoData=measured ? day.photoData : await Promise.all(day.photos.map(photoStats));
-  const reading=day.reading?.feelings ? day.reading : localReading(day.story);
-  const next={...day,photoData,reading,imprint:makeImprint(day.story,photoData,day.music.analysis,reading)};
+  const reading=day.reading?.feelings ? day.reading : await readStory(day.story,false);
+  const next={...day,photoData,reading,imprint:makeImprint(day.story,photoData,day.music.analysis,reading,day.date)};
   saveDay(next).catch(()=>{});
   return next;
 }
@@ -556,7 +558,7 @@ const results=await Promise.allSettled([
   loadDays().then(stored=>settle(stored.map(upgrade))),
   settle(demos.map(async demo=>{
     const photoData=await Promise.all(demo.photoSources.map(photoStats));
-    return {...demo,photoData,imprint:makeImprint(demo.story,photoData,demo.music.analysis,demo.reading)};
+    return {...demo,photoData,imprint:makeImprint(demo.story,photoData,demo.music.analysis,demo.reading,demo.date)};
   })),
   loadRecordings(),
   readingStatus()
