@@ -1,4 +1,5 @@
 import {extraExamples} from './example-days.mjs';
+import {ayaulymDay} from './ayaulym-day.mjs';
 import {readContext} from './context.mjs';
 import {language, t} from './i18n.mjs';
 import {feelingLabel} from './feelings.mjs';
@@ -31,7 +32,7 @@ const originalDemos = [
   narration:`./media/${id}-voice.mp3`, created:0
 }));
 
-export const demos = [...originalDemos, ...extraExamples];
+export const demos = [...originalDemos, ...extraExamples, ayaulymDay];
 
 // Sample entries are translated editorially. A user's own entry is always shown as written.
 const sampleCopy = {

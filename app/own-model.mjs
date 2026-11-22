@@ -13,6 +13,7 @@
 // or to null when the model cannot be used; the dictionary answers then.
 import {language, storyLanguage, t} from './i18n.mjs';
 import {cleanFeelings, feelingName, localFeelings, localTitle} from './feelings.mjs';
+import {storyMoments} from './story-scene.mjs';
 
 // Output order of the weights: the four opposite pairs, as in the corpus.
 export const ORDER = ['joy', 'sadness', 'calm', 'tension', 'festive', 'quiet', 'warmth', 'solitude'];
@@ -279,8 +280,11 @@ export async function ownReading(story) {
     const {out, parts} = predict(model, features, true);
     const evidence = readingEvidence(story, features, parts, out);
     const lang = storyLanguage(story);
+    const mood = values => Object.fromEntries(ORDER.map((id, index) => [id, values[index]]));
+    const moments = storyMoments(story, part => mood(predict(model, featurize(part, model.lexicon, model.featureVersion)).out))
+      ?? storyMoments(story);
     return {
-      feelings: cleanFeelings(Object.fromEntries(ORDER.map((id, f) => [id, out[f]]))),
+      feelings: cleanFeelings(mood(out)), moments,
       title: localTitle(story, lang), reason: readingReason(evidence), evidence, language: lang, source: 'own', model: model.name
     };
   } catch {

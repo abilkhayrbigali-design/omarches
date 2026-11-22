@@ -39,7 +39,7 @@ def main():
     shutil.copy2(ROOT / "mood-server" / "semantic" / "requirements.txt", SITE / "requirements.txt")
     server_app = SITE / "app"
     (server_app / "model").mkdir(parents=True)
-    for name in ("own-model.mjs", "feelings.mjs", "i18n.mjs", "translations.mjs", "context.mjs", "context-signs.mjs", "context-page.mjs", "context-spelling.mjs", "model/mood-3.json", "model/mood-3.bin"):
+    for name in ("own-model.mjs", "feelings.mjs", "story-scene.mjs", "i18n.mjs", "translations.mjs", "context.mjs", "context-signs.mjs", "context-page.mjs", "context-spelling.mjs", "model/mood-3.json", "model/mood-3.bin"):
         shutil.copy2(ROOT / "app" / name, server_app / name)
     shutil.copytree(ROOT / "hosted" / "api", SITE / "api", ignore=shutil.ignore_patterns("__pycache__"))
     shutil.copy2(ROOT / "hosted" / "vercel.json", SITE / "vercel.json")

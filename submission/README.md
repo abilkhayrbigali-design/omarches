@@ -5,8 +5,9 @@ Genesis Hackathon 2026 · ArtTech · Make the Invisible Visible
 | Материал | Ссылка или файл |
 |---|---|
 | Рабочий прототип | [Веб-версия](https://ottisk-eta.vercel.app/app/) · [запасная копия без серверной части](https://abilkhayrbigali-design.github.io/omarches/) |
+| День участницы команды | [Хэллоуин Аяулым в Mega Silkway](https://ottisk-eta.vercel.app/app/#day/ayaulym-halloween) · шесть фотографий, рассказ и песня |
 | Сценарий проверки и карта кода | [Памятка для жюри](../docs/jury-guide.md) |
-| Шесть примеров | [Изображения и названия](examples/README.md) · [офлайн-сцены в ZIP](examples/ottisk-examples.zip) |
+| Семь примеров | [Изображения и названия](examples/README.md) · [офлайн-сцены в ZIP](examples/ottisk-examples.zip) |
 | Описание | [Одна страница](ottisk-description.pdf) |
 | Художественные приёмы, вклад и инструменты | [Приёмы и источники](techniques.md) |
 | Исходный код | [Репозиторий](https://github.com/abilkhayrbigali-design/omarches) · [инструкция запуска](../README.md#запуск) |
@@ -20,6 +21,6 @@ Genesis Hackathon 2026 · ArtTech · Make the Invisible Visible
 
 ## Проверка без ключей
 
-Откройте [веб-прототип](https://ottisk-eta.vercel.app/app/) и создайте запись со своим текстом, фотографией и аудиофайлом. Живая версия также предлагает 16 готовых дней. Для офлайн-проверки скачайте [архив примеров](examples/ottisk-examples.zip), распакуйте и откройте корневой `index.html`. Локальный запуск из исходников — `python3 server.py`.
+Откройте [веб-прототип](https://ottisk-eta.vercel.app/app/) и создайте запись со своим текстом, фотографией и аудиофайлом. На главной странице доступны три подборки оформлений. [Праздники](https://ottisk-eta.vercel.app/app/#examples/occasion) · [Погода](https://ottisk-eta.vercel.app/app/#examples/weather) · [Настроения](https://ottisk-eta.vercel.app/app/#examples/mood). Для офлайн-проверки скачайте [архив примеров](examples/ottisk-examples.zip), распакуйте и откройте корневой `index.html`. Локальный запуск из исходников — `python3 server.py`.
 
 Команда проекта: Абулхаир, Чингиз, Аяулым и Нурсултан. Роли, использованные библиотеки, модели и лицензии перечислены в [технических и художественных материалах](techniques.md).

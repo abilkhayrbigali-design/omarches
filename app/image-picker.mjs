@@ -4,6 +4,7 @@ const maxBytes = 20 * 1024 * 1024;
 
 export function setupImagePicker(form) {
   const strip = form.querySelector('#photo-strip');
+  const orderStatus = form.querySelector('#frame-order-status');
   const upload = form.elements.photos;
   const make = form.querySelector('#generate-image');
   const accept = form.querySelector('#accept-image');
@@ -39,23 +40,55 @@ export function setupImagePicker(form) {
 
   function showFrames() {
     strip.replaceChildren();
-    for (const frame of frames) {
+    for (const [index,frame] of frames.entries()) {
+      const item = document.createElement('div');
+      item.className = 'frame-item';
       const chip = document.createElement('div');
       chip.className = 'frame-chip';
       const image = new Image();
       image.src = frame.url;
-      image.alt = frame.file.name;
+      image.alt = frame.file.name || t`Кадр ${index+1}`;
       const remove = document.createElement('button');
       remove.type = 'button';
       remove.textContent = '×';
-      remove.setAttribute('aria-label',t('Убрать кадр «')+frame.file.name+'»');
+      remove.setAttribute('aria-label',t`Убрать кадр ${index+1}`);
       remove.addEventListener('click', () => {
-        frames.splice(frames.indexOf(frame),1);
+        frames.splice(index,1);
         URL.revokeObjectURL(frame.url);
         showFrames();
+        const neighbor = strip.children[Math.min(index,frames.length-1)];
+        if (neighbor) neighbor.querySelector('.frame-chip button').focus();
+        else upload.focus();
       });
       chip.append(image,remove);
-      strip.append(chip);
+      item.append(chip);
+      if (frames.length>1) {
+        const order = document.createElement('div');
+        order.className = 'frame-order';
+        for (const offset of [-1,1]) {
+          const position=index+offset;
+          const direction=offset<0?'earlier':'later';
+          const move=document.createElement('button');
+          move.type='button';
+          move.className='plain bordered';
+          move.dataset.move=direction;
+          move.textContent=offset<0?'←':'→';
+          move.disabled=position<0 || position>=frames.length;
+          const label=offset<0?t`Переместить кадр ${index+1} раньше`:t`Переместить кадр ${index+1} позже`;
+          move.setAttribute('aria-label',label);
+          move.title=label;
+          move.addEventListener('click',()=>{
+            [frames[index],frames[position]]=[frames[position],frames[index]];
+            showFrames();
+            const moved=strip.children[position];
+            (moved.querySelector(`[data-move="${direction}"]:enabled`) || moved.querySelector('.frame-chip button')).focus();
+            orderStatus.textContent=t`Кадр ${index+1} перемещён на позицию ${position+1}.`;
+          });
+          order.append(move);
+        }
+        item.append(order);
+      }
+      strip.append(item);
     }
     refreshCapacity();
   }
@@ -180,6 +213,12 @@ export function setupImagePicker(form) {
       return frames.map(frame=>frame.file);
     },
     origins() { return frames.map(frame=>frame.origin); },
+    restore(photos, origins) {
+      for (const [index,file] of photos.entries()) {
+        frames.push({file,url:URL.createObjectURL(file),origin:origins?.[index] ?? {type:'upload'}});
+      }
+      showFrames();
+    },
     reset() {
       stopPending();
       discardPreview();
@@ -188,6 +227,7 @@ export function setupImagePicker(form) {
       generationNumber=0;
       scene.value='';
       story='';
+      orderStatus.textContent='';
       showFrames();
     }
   };

@@ -138,8 +138,8 @@ const listen = (selector, kind) => page.locator(selector).evaluate((audio, name)
   for (const event of ['play', 'pause', 'ended']) audio.addEventListener(event, () => window.demoSound(name, event, audio.currentTime));
 }, kind);
 
-await page.goto(site + '/');
-await page.waitForSelector('.day-card');
+await page.goto(site + '/#examples');
+await page.waitForSelector('#examples-grid .day-card');
 await page.evaluate(() => document.fonts.ready);
 await page.mouse.move(WIDTH * .7, HEIGHT * .55);
 await cdp.send('Page.startScreencast', {format: 'jpeg', quality: 90, everyNthFrame: 1});
@@ -148,10 +148,7 @@ await pause(1.2);
 // 1. The diary as it is.
 say('«Оттиск» — дневник, который хранит не только кадры, но и ощущение дня');
 await pause(3.6);
-say('У дневника есть настроение: восемь чисел в четырёх парах противоположностей');
-await glide('.diary-mood');
-await pause(3.6);
-await glide('#archive-grid', 'start');
+await glide('#examples-grid', 'start');
 say('Каждый день оформлен по-своему, но это страницы одного дневника');
 await pause(3.2);
 await top();
@@ -284,7 +281,7 @@ await pause(.8);
 // 6. Back in the archive: the diary has moved a little.
 await top();
 await click('.back');
-await page.waitForSelector('.day-card');
+await page.waitForSelector('#archive-grid .day-card');
 if (await page.evaluate(title => document.querySelector('.featured h2')?.textContent === title, dayTitle)) {
   say('Новая запись понемногу сдвинула числа всего дневника: стрелки показывают, на сколько');
   await pause(2.6);
@@ -300,12 +297,13 @@ if (await page.evaluate(title => document.querySelector('.featured h2')?.textCon
   await pause(2.8);
 }
 say('Композиция меняется с настроением. У радостного дня светлая страница, кадр лежит отпечатком');
-await glide('#archive-grid', 'start');
+await click('.nav-link[href="#examples"]');
+await glide('#examples-grid', 'start');
 await pause(1);
 await click('.day-card[href="#day/train"]');
 await pause(3.8);
 await click('.back');
-await page.waitForSelector('.day-card');
+await page.waitForSelector('#examples-grid .day-card');
 say('Карточка вырастает в сцену. У напряжённого дня сетка, рубленый шрифт и резкое движение');
 await pause(.8);
 await click('.day-card[href="#day/office"]');

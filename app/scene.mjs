@@ -1,7 +1,7 @@
-import {language, t} from './i18n.mjs';
+import {language, storyLanguage, t} from './i18n.mjs';
 // Markup for a memory, built only from strings so the page and the exported
 // folder draw a day in exactly the same way.
-import {FEELINGS, IDS, PAIRS, clamp, feelingName, motionTokens, opposite} from './feelings.mjs';
+import {FEELINGS, IDS, PAIRS, clamp, feelingLabel, feelingName, motionTokens, opposite} from './feelings.mjs';
 import {contextRules, contextSVG} from './context.mjs';
 
 export const escape = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -283,15 +283,76 @@ export function motifSVG(imprint, seed) {
 export const layersHTML = (imprint, seed, {motif = true} = {}) =>
   `<div class="wash"></div><div class="leak"></div>${motif ? motifSVG(imprint, seed) + contextSVG(imprint.context, imprint, seed) : ''}<div class="scrim"></div><div class="grain"></div>`;
 
+const phaseLabels = ['В начале дня', 'В конце дня'];
+const phaseNames = ['start', 'end'];
+
+export function momentLine(imprint) {
+  if (!imprint.moments) return '';
+  const [first, last] = imprint.moments.map(moment => feelingLabel(moment.feelings));
+  return t`Смена настроения: ${first} → ${last}.`;
+}
+
+function appearance(imprint, id, phase) {
+  const moment = imprint.moments?.[phase];
+  const i = moment ?? imprint;
+  const key = moment ? id + '-' + phaseNames[phase] : id;
+  const treat = treatment(i, 's-' + key);
+  return {
+    attrs: `data-face="${i.face}" data-place="${i.place}" data-duration="${i.duration}"${treat.attr}${moment ? ` data-moment="${phaseNames[phase]}" data-moment-label="${escape(t(phaseLabels[phase]))}"` : ''} style="${sceneStyle(i)}${treat.style}"`,
+    svg: treat.svg + motifSVG(i, key),
+  };
+}
+
+function appearanceTemplates(imprint, id, first) {
+  const templates = imprint.moments ? [first, appearance(imprint, id, 1)] : [first];
+  return templates.map(({attrs, svg}, index) => `<template data-scene-moment="${index}" ${attrs}>${svg}</template>`).join('');
+}
+
+// This function is also embedded in the downloadable scene. Its templates carry
+// the same rendered styles and figures as the version in the diary.
+export function applySceneMoment(scene, index, count) {
+  const first = scene.querySelector('template[data-scene-moment="0"]');
+  const last = scene.querySelector('template[data-scene-moment="1"]');
+  const view = last && index >= Math.ceil(count / 2) ? last : first;
+  if (scene.dataset.activeMoment === view.dataset.sceneMoment) return;
+  scene.dataset.activeMoment = view.dataset.sceneMoment;
+  scene.dataset.face = view.dataset.face;
+  scene.dataset.place = view.dataset.place;
+  scene.dataset.duration = view.dataset.duration;
+  if (view.dataset.moment) scene.dataset.moment = view.dataset.moment;
+  else delete scene.dataset.moment;
+  const label = scene.querySelector('.moment-label');
+  if (label) label.textContent = view.dataset.momentLabel;
+  scene.toggleAttribute('data-treat', view.hasAttribute('data-treat'));
+  const band = scene.style.getPropertyValue('--band');
+  scene.style.cssText = view.style.cssText;
+  if (band) scene.style.setProperty('--band', band);
+  scene.querySelector(':scope > .treat')?.remove();
+  scene.querySelector(':scope > .motif').remove();
+  scene.prepend(view.content.cloneNode(true));
+}
+
+export function refreshSceneMoments(scene, day, index, count) {
+  scene.querySelectorAll('template[data-scene-moment]').forEach(template => template.remove());
+  scene.insertAdjacentHTML('beforeend', appearanceTemplates(day.imprint, day.id, appearance(day.imprint, day.id, 0)));
+  delete scene.dataset.activeMoment;
+  applySceneMoment(scene, index, count);
+}
+
 export function sceneHTML(day, sources, dateText, heading = 'h1') {
   const i = day.imprint;
-  const frames = sources.map((source, index) => `<img class="frame${index ? '' : ' visible'}" src="${escape(source)}" alt="">`).join('');
-  const dots = sources.length > 1 ? `<div class="positions" aria-label="${t("Кадры")}">${sources.map((_, index) =>
-    `<button class="dot" type="button" data-index="${index}" aria-label="${t`Кадр ${index + 1}`}" aria-pressed="${index === 0}"></button>`).join('')}</div>` : '';
-  const treat = treatment(i, 's-' + day.id);
-  return `<section class="memory" data-face="${i.face}" data-place="${i.place}" data-duration="${i.duration}"${treat.attr} style="${sceneStyle(i)}${treat.style}">
-    ${treat.svg}<div class="frames" aria-hidden="true">${frames}</div>${layersHTML(i, day.id)}
-    <div class="scene-text"><time datetime="${escape(day.date)}">${escape(dateText)}</time><${heading} id="day-heading">${escape(i.title)}</${heading}><p>${escape(i.excerpt)}</p></div>${dots}
+  const images = i.moments && sources.length === 1 ? [sources[0], sources[0]] : sources;
+  const frames = images.map((source, index) => `<img class="frame${index ? '' : ' visible'}" src="${escape(source)}" alt="">`).join('');
+  const dots = images.length > 1 ? `<div class="positions" aria-label="${t(i.moments ? 'Смена настроения' : 'Кадры')}">${images.map((_, index) => {
+    const frame = t`Кадр ${index + 1}`;
+    const phase = i.moments ? t(phaseLabels[Number(index >= Math.ceil(images.length / 2))]) : '';
+    return `<button class="dot" type="button" data-index="${index}" aria-label="${escape(phase ? `${phase} · ${frame}` : frame)}" aria-pressed="${index === 0}"></button>`;
+  }).join('')}</div>` : '';
+  const first = appearance(i, day.id, 0);
+  return `<section class="memory"${day.participantExample ? ' data-photo-album' : ''} data-active-moment="0" ${first.attrs}>
+    ${first.svg}<div class="frames" aria-hidden="true">${frames}</div>${layersHTML(i, day.id, {motif:false})}${contextSVG(i.context, i, day.id)}
+    <div class="scene-text"><div class="scene-date"><time datetime="${escape(day.date)}">${escape(dateText)}</time>${i.moments ? `<span class="moment-label">${escape(t(phaseLabels[0]))}</span>` : ''}</div><${heading} id="day-heading">${escape(i.title)}</${heading}><p lang="${storyLanguage(day.story)}">${escape(i.excerpt)}</p></div>${dots}
+    ${appearanceTemplates(i, day.id, first)}
   </section>`;
 }
 

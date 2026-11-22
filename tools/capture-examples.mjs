@@ -4,14 +4,15 @@
 //
 // Needs the diary running (default http://localhost:8765, override with OTTISK_URL),
 // Chromium (CHROMIUM, default /usr/bin/chromium) and the playwright-core package
-// (PLAYWRIGHT_CORE may point at its folder). A fresh browser profile is used, so
-// only the six built-in days are captured.
+// (PLAYWRIGHT_CORE may point at its folder). The examples gallery supplies the
+// built-in days and keeps personal records out of the captures.
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const target = path.join(root, 'submission', 'examples');
+const submissionDays = ['ayaulym-halloween', 'maple', 'office', 'train', 'rain', 'lake', 'cake'];
 const site = process.env.OTTISK_URL || 'http://localhost:8765';
 const core = process.env.PLAYWRIGHT_CORE
   ? await import(pathToFileURL(path.join(process.env.PLAYWRIGHT_CORE, 'index.mjs')).href)
@@ -25,6 +26,7 @@ page.on('pageerror', error => problems.push(String(error)));
 
 const settle = async () => {
   await page.evaluate(() => document.fonts.ready);
+  await page.locator('img.frame[loading="lazy"]').evaluateAll(images => images.forEach(image => { image.loading = 'eager'; }));
   await page.waitForFunction(() => [...document.querySelectorAll('img.frame')].every(image => image.complete && image.naturalWidth > 0));
   // A view enters in the character of its mood; the slowest days take over two seconds to settle.
   await page.waitForTimeout(2900);
@@ -39,14 +41,22 @@ const whole = async name => {
   await page.waitForTimeout(200);
 };
 
-await page.goto(site + '/');
-await page.waitForSelector('.day-card');
+await page.goto(site + '/#examples');
+await page.waitForSelector('#examples-grid .day-card');
+await page.locator('#examples-grid .day-card').evaluateAll((cards, ids) => {
+  for (const card of cards) {
+    if (!ids.includes(card.hash.slice('#day/'.length))) card.remove();
+  }
+}, submissionDays);
+if (await page.locator('#examples-grid .day-card').count() !== submissionDays.length) {
+  throw new Error('В галерее отсутствует один из дней для сдачи.');
+}
 await settle();
-const titles = await page.$$eval('.day-card', cards => cards.map(card => `${card.querySelector('h3').textContent} — ${card.querySelector('.mood-label').textContent.trim()}`));
-await page.locator('#archive-grid').screenshot({path: path.join(target, 'archive.jpg'), type: 'jpeg', quality: 88});
+const titles = await page.$$eval('#examples-grid .day-card', cards => cards.map(card => `${card.querySelector('h3').textContent} — ${card.querySelector('.mood-label').textContent.trim()}`));
+await page.locator('#examples-grid').screenshot({path: path.join(target, 'archive.jpg'), type: 'jpeg', quality: 88});
 await whole('site-archive.jpg');
 
-for (const id of ['maple', 'office', 'train', 'rain', 'lake', 'cake']) {
+for (const id of submissionDays) {
   await page.goto(`${site}/#day/${id}`);
   await page.waitForSelector('.memory');
   await settle();
@@ -54,10 +64,19 @@ for (const id of ['maple', 'office', 'train', 'rain', 'lake', 'cake']) {
   if (id === 'office' || id === 'cake') await whole(`site-day-${id}.jpg`);
 }
 
-await page.goto(site + '/');
-await page.waitForSelector('#export-archive');
-await page.waitForTimeout(600);
-const [download] = await Promise.all([page.waitForEvent('download'), page.click('#export-archive')]);
+await page.goto(site + '/#examples');
+const [download] = await Promise.all([page.waitForEvent('download'), page.evaluate(async ids => {
+  const {demos,localizedDay} = await import('./demos.mjs');
+  const {photoStats,makeImprint} = await import('./atmosphere.mjs');
+  const {downloadArchive} = await import('./export.mjs');
+  const selected = await Promise.all(ids.map(async id => {
+    const day = demos.find(sample => sample.id === id);
+    const photoData = await Promise.all(day.photoSources.map(photoStats));
+    const imprint = makeImprint(day.story,photoData,day.music.analysis,day.reading,day.date);
+    return localizedDay({...day,photoData,imprint});
+  }));
+  await downloadArchive(selected);
+}, submissionDays)]);
 await download.saveAs(path.join(target, 'ottisk-examples.zip'));
 await browser.close();
 

@@ -1,7 +1,8 @@
-// Reading a story: the language model behind the diary's own server (the local one,
-// or the small public one of the hosted copy) when the author allows it, otherwise
-// the diary's own model on the device, and the dictionary as the last resort.
-import {cleanFeelings, localReading, localTitle} from './feelings.mjs';
+// Reading a story: where the diary's server model is published (the hosted copy) it
+// reads every entry, and OpenAI reads only when the author asks. A copy without that
+// server, or a server that does not answer, leaves the entry to the diary's own model
+// on the device, and the dictionary is the last resort.
+import {cleanFeelings, localReading, localTitle, validAutoTitle} from './feelings.mjs';
 import {ownReading} from './own-model.mjs';
 import {language, storyLanguage} from './i18n.mjs';
 
@@ -17,6 +18,13 @@ export async function readingStatus() {
     available:Boolean(info?.available), model:String(info?.model ?? ''),
     server:Boolean(info || enhanced), hosted:Boolean(info?.hosted), enhanced:Boolean(enhanced?.available)
   };
+}
+
+// The server model takes a while to wake after a quiet spell, so it is nudged while
+// the author is still writing and the first reading does not wait for it.
+export function warmServerModel() {
+  fetch('/api/mood_semantic',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({text:'день'}),signal:AbortSignal.timeout(50000)}).catch(()=>{});
 }
 
 // Without the outside model, the diary's own model reads on the device; the dictionary
@@ -38,12 +46,12 @@ export async function readStory(story, mode) {
     if (response.ok) {
       const data = await response.json();
       const title = String(data.title ?? '').trim();
-      const count = title.split(/\s+/).filter(Boolean).length;
       return {
         feelings: cleanFeelings(data.feelings),
-        title: count >= 2 && count <= 8 && title.length <= 90 ? title : localTitle(story, entryLanguage),
+        title: validAutoTitle(title,entryLanguage) ? title : localTitle(story, entryLanguage),
         reason:String(data.reason ?? '').slice(0, 240), reasonLanguage, language:entryLanguage,
         evidence:enhanced ? data.evidence : undefined, model:String(data.model ?? ''),
+        moments:(await ownReading(story))?.moments,
         source:enhanced ? 'server' : 'ai'
       };
     }

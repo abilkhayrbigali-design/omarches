@@ -1,6 +1,9 @@
 import {t} from './i18n.mjs';
-import {cleanFeelings, feelingLabel, localReading, localTitle, sceneTokens, withMusic, withPhotos} from './feelings.mjs';
+import {IDS, cleanFeelings, feelingLabel, localReading, localTitle, sceneTokens, withMusic, withPhotos} from './feelings.mjs';
 import {readContext} from './context.mjs';
+import {storyExcerpt, storyMoments} from './story-scene.mjs';
+
+export {storyExcerpt};
 
 const clamp = (x, min, max) => Math.min(max, Math.max(min, x));
 const mean = numbers => numbers.reduce((sum, n) => sum+n, 0)/numbers.length;
@@ -201,12 +204,6 @@ export async function audioStats(file) {
   return {bpm:confidence ? Math.round(3000/lag):null, energy:clamp(accents/(size/50*6),.10,1), tone:heard.tone, mode:heard.mode, key:heard.key, confidence};
 }
 
-export function storyExcerpt(story) {
-  const sentences = story.trim().split(/(?<=[.!?…])\s+|\n+/u).filter(Boolean);
-  const caption = [...sentences].sort((a,b)=>Math.abs(a.length-83)-Math.abs(b.length-83))[0];
-  return caption.length > 152 ? caption.slice(0,148).replace(/\s+\S*$/u,'')+'…' : caption;
-}
-
 // Text gives the eight numbers. Photographs lean them by the warmth, density and light of
 // the frames, then music nudges pace and brightness. The photo also gives the scene its hue.
 // `reading` is {feelings, title, ...} from the language model or from the dictionary on the device.
@@ -218,8 +215,21 @@ export function makeImprint(story, photos, audio, reading, date) {
   const feelings = withMusic(pictured, audio);
   const photo = photos.reduce((a,b)=>a.weight>b.weight?a:b);
   const light = mean(photos.map(frame=>frame.light));
+  const phases = Array.isArray(read.moments) && read.moments.length === 2 ? read.moments : storyMoments(story);
+  const split = Math.ceil(photos.length / 2);
+  // Keep the overall day's reading present, especially after a manual adjustment.
+  const weight = read.source === 'manual' ? .55 : .85;
+  const moments = phases?.map((phase, index) => {
+    const frames = (index ? photos.slice(split) : photos.slice(0, split));
+    const inputs = frames.length ? frames : photos;
+    const image = inputs.reduce((a,b)=>a.weight>b.weight?a:b);
+    const basis = cleanFeelings(phase);
+    const mood = cleanFeelings(Object.fromEntries(IDS.map(id => [id, weight * basis[id] + (1 - weight) * text[id]])));
+    const feelings = withMusic(withPhotos(mood, inputs), audio);
+    return {feelings, ...sceneTokens(feelings, {...image, light:mean(inputs.map(frame=>frame.light))}, audio)};
+  });
   return {
-    v:6, context:readContext(story, date), title:String(read.title || '').trim() || localTitle(story), excerpt:storyExcerpt(story), text, pictured, feelings, moodName:feelingLabel(feelings),
+    v:7, context:readContext(story, date), title:String(read.title || '').trim() || localTitle(story), excerpt:storyExcerpt(story), text, pictured, feelings, moodName:feelingLabel(feelings), moments,
     light, photoHue:Math.round(photo.hue), photoSat:Math.round(photo.sat), ...sceneTokens(feelings, {...photo, light}, audio)
   };
 }

@@ -67,6 +67,13 @@ const examples = [
     en:['First frost on the window','It was freezing in the morning. Frost left delicate patterns on the glass. I sat down with hot tea to watch the first people pass outside.']
   },
   {
+    id:'leaves-in-the-wind', date:'2026-10-09', image:'bench', track:'lake',
+    feelings:{joy:.61, warmth:.49, quiet:.35, calm:.47},
+    ru:['Кленовый лист в какао','Сильный ветер закрутил сухие листья под скамейкой. Я поставила кружку на угол билета, чтобы он не улетел. Один кленовый лист всё-таки приземлился прямо в какао.'],
+    kk:['Какаоға түскен үйеңкі жапырағы','Қатты жел орындықтың астындағы қураған жапырақтарды үйіріп әкетті. Билетім ұшып кетпесін деп бір бұрышын кесемен бастырып қойдым. Бір үйеңкі жапырағы бәрібір какаоның ішіне түсіп кетті.'],
+    en:['A maple leaf in my cocoa','A strong wind swirled dry leaves beneath the bench. I set my mug on a corner of my ticket to keep it from blowing away. One maple leaf still landed right in my cocoa.']
+  },
+  {
     id:'farewell', date:'2026-10-15', image:'farewell', track:'rain',
     feelings:{sadness:.98, solitude:.48, quiet:.38, warmth:.34},
     ru:['Чашка на пустой веранде','На пустой веранде осталась её чашка. Я долго сидела на ступеньках и всё ждала, что она позовёт меня по имени. Было грустно, и я скучала по ней.'],

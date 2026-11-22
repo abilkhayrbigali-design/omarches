@@ -12,7 +12,8 @@
 <body>
   <header class="top">
     <a class="brand" href="#" aria-label="Оттиск, архив"><span class="mark" id="brand-mark" aria-hidden="true"></span> Оттиск<span class="brand-note">Личный дневник</span></a>
-    <nav aria-label="Разделы"><a class="nav-link" href="#archive">Архив</a><label class="sr-only" for="language">Язык интерфейса</label><select id="language"><option value="ru" lang="ru" translate="no">Русский</option><option value="kk" lang="kk">Қазақша</option><option value="en" lang="en">English</option></select><button class="primary" id="compose">Записать день</button></nav>
+    <nav class="nav-pages" aria-label="Разделы"><a class="nav-link" href="#archive">Мой дневник</a><a class="nav-link" href="#examples">Примеры</a></nav>
+    <div class="nav-tools"><label class="sr-only" for="language">Язык интерфейса</label><select id="language"><option value="ru" lang="ru" translate="no">Русский</option><option value="kk" lang="kk">Қазақша</option><option value="en" lang="en">English</option></select><button class="primary" id="compose">Записать день</button></div>
   </header>
   <main id="main" tabindex="-1"></main>
   <dialog id="editor" aria-labelledby="editor-title">
@@ -20,12 +21,14 @@
       <div class="dialog-top"><div><p class="eyebrow" id="step-count" aria-live="polite">Шаг 1 из 3</p><h2 id="editor-title" tabindex="-1">Каким был день?</h2></div><button type="button" class="plain close" id="close-editor" aria-label="Закрыть">×</button></div>
       <section data-step="1">
       <label>Дата <input name="date" type="date" required></label>
+      <div id="day-title-field" hidden>
+        <label>Название дня <input name="dayTitle" maxlength="120" aria-describedby="day-title-help"></label>
+        <p id="day-title-help" class="hint">Оставьте поле пустым, чтобы дневник назвал день сам.</p>
+      </div>
       <label>Текст дня <textarea name="story" placeholder="Где вы были? Какими были свет, звуки и люди рядом?" required maxlength="6000" rows="4"></textarea></label>
       <label>Язык диктовки <select name="dictationLanguage"><option value="ru">Русский</option><option value="kk">Казахский</option><option value="en">Английский</option></select></label>
       <button type="button" id="dictate-story" class="plain bordered">Надиктовать день</button>
       <p id="dictation-status" class="hint" role="status"></p>
-      <label class="check" id="server-consent" hidden><input type="checkbox" name="useServer" aria-describedby="server-hint"> Прочитать усиленной моделью «Оттиска»</label>
-      <p id="server-hint" class="hint" hidden>Текст отправится на сервер «Оттиска» для анализа.</p>
       <label class="check" id="ai-consent" hidden><input type="checkbox" name="useAI"> Прочитать запись моделью OpenAI вместо своей</label>
       <p class="hint" id="reading-hint"></p>
       </section>
@@ -33,6 +36,7 @@
       <label>Фотографии <input name="photos" type="file" accept="image/*" multiple aria-describedby="photo-help"></label>
       <p class="hint" id="photo-help">Можно загрузить фотографии и добавить иллюстрации по рассказу. Всего до 12 кадров, каждый до 20 МБ.</p>
       <div id="photo-strip" aria-label="Кадры дня"></div>
+      <p class="sr-only" id="frame-order-status" role="status"></p>
       <fieldset class="image-generator">
         <legend>Изображение по рассказу</legend>
         <label>Описание для OpenAI <textarea id="image-description" maxlength="6000" rows="3"></textarea></label>
@@ -49,7 +53,8 @@
       </section>
       <section data-step="3" hidden>
       <fieldset class="music-field"><legend class="sr-only">Песня дня</legend>
-        <div class="choice"><label><input type="radio" name="musicType" value="assist" checked> Из интернета</label><label><input type="radio" name="musicType" value="file"> Аудиофайл</label><label><input type="radio" name="musicType" value="link"> Ссылка</label><label><input type="radio" name="musicType" value="generate"> Сочинить</label></div>
+        <div class="choice"><label id="keep-music-choice" hidden><input type="radio" name="musicType" value="keep" disabled> Оставить песню</label><label><input type="radio" name="musicType" value="assist" checked> Из интернета</label><label><input type="radio" name="musicType" value="file"> Аудиофайл</label><label><input type="radio" name="musicType" value="link"> Ссылка</label><label><input type="radio" name="musicType" value="generate"> Сочинить</label></div>
+        <p class="hint" id="kept-music" hidden></p>
         <div id="music-assist">
           <p class="hint" id="query-reason"></p>
           <p id="music-progress" class="music-progress" role="status"></p>

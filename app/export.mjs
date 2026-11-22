@@ -1,62 +1,21 @@
 import {formatDate, language, numberFormat, storyLanguage, t} from './i18n.mjs';
 import {foldDiary, motionLine, siteTokens} from './feelings.mjs';
-import {escape, placeLine, rulesHTML, sceneHTML, stampSVG, themeStyle} from './scene.mjs';
+import {applySceneMoment, escape, momentLine, placeLine, rulesHTML, sceneHTML, stampSVG, themeStyle} from './scene.mjs';
 import {contextPageHTML} from './context.mjs';
 import {weatherLayer} from './weather.mjs';
-
-const encoder = new TextEncoder();
-const crcTable = Uint32Array.from({length:256},(_,index)=>{
-  let value=index;
-  for(let bit=0;bit<8;bit++) value=(value>>>1)^((value&1)?0xedb88320:0);
-  return value;
-});
-
-function crc32(bytes) {
-  let value=0xffffffff;
-  for (const byte of bytes) value=(value>>>8)^crcTable[(value^byte)&255];
-  return (value^0xffffffff)>>>0;
-}
-
-function writeRecord(size, words, shorts) {
-  const view=new DataView(new ArrayBuffer(size));
-  for (const [position,value] of words) view.setUint32(position,value,true);
-  for (const [position,value] of shorts) view.setUint16(position,value,true);
-  return view.buffer;
-}
-
-async function zip(entries) {
-  const contents=[];
-  const directory=[];
-  let offset=0, directoryLength=0;
-  if(entries.length>65535) throw Error('Слишком много файлов.');
-  for (const [filename, entry] of entries) {
-    const path=encoder.encode(filename);
-    const bytes=typeof entry==='string'?encoder.encode(entry):new Uint8Array(await entry.arrayBuffer());
-    const checksum=crc32(bytes);
-    const size=bytes.length;
-    if(offset+size+30+path.length>=0xffffffff) throw Error('Архив слишком велик.');
-    const flags=0x800;
-    contents.push(writeRecord(30,[[0,0x04034b50],[14,checksum],[18,size],[22,size]],[[4,20],[6,flags],[12,33],[26,path.length]]),path,bytes);
-    // Marked as made on Unix with ordinary file permissions: Info-ZIP on Linux then keeps Cyrillic folder names.
-    directory.push(writeRecord(46,[[0,0x02014b50],[16,checksum],[20,size],[24,size],[38,0x81a40000],[42,offset]],[[4,0x0314],[6,20],[8,flags],[14,33],[28,path.length]]),path);
-    offset+=30+path.length+size;
-    directoryLength+=46+path.length;
-  }
-  if(offset+directoryLength+22>=0xffffffff) throw Error('Архив слишком велик.');
-  const end=writeRecord(22,[[0,0x06054b50],[12,directoryLength],[16,offset]],[[8,entries.length],[10,entries.length]]);
-  return new Blob([...contents,...directory,end],{type:'application/zip'});
-}
+import {writeZip} from './zip.mjs';
 
 const clean = text => text.replace(/[^\p{L}\p{N} ._–-]/gu,' ').replace(/\s+/g,' ').trim().slice(0,90).replace(/[. ]+$/u,'');
 const folderName = day => `${clean(day.imprint.title)} — ${day.date}`;
 const ext = name => /^\w{1,8}$/u.test(name.split('.').at(-1)) && name.includes('.') ? '.'+name.split('.').at(-1).toLowerCase() : '';
+const fileMetadata = entry => typeof entry==='string' || !entry ? undefined : {type:entry.type,name:entry.name,lastModified:entry.lastModified};
 async function asset(url) {
   const response=await fetch(url);
   if(!response.ok) throw Error('Файл недоступен.');
   return response.blob();
 }
 
-function offlineScene(labels) {
+function offlineScene(labels, applyMoment) {
   // The page enters once in the character of the day, as it does in the diary.
   const page=document.querySelector('main');
   page.classList.add('entering');
@@ -66,6 +25,7 @@ function offlineScene(labels) {
   const caption=scene.querySelector('.scene-text');
   const fit=()=>scene.style.setProperty('--band',Math.ceil(caption.offsetHeight)+'px');
   fit(); addEventListener('resize',fit); addEventListener('load',fit);
+  if (typeof ResizeObserver !== 'undefined') new ResizeObserver(fit).observe(caption);
   const frames=[...scene.querySelectorAll('.frame')];
   const dots=[...scene.querySelectorAll('.dot')];
   const audio=document.querySelector('#track');
@@ -78,32 +38,59 @@ function offlineScene(labels) {
     frame=(index+frames.length)%frames.length;
     frames[frame].classList.add('visible');
     dots[frame]?.setAttribute('aria-pressed','true');
+    applyMoment(scene,frame,frames.length);
+  }
+  function scheduleFrame() {
+    clearTimeout(timer);
+    if (!active || frames.length<2 || (scene.dataset.moment && frame===frames.length-1)) return;
+    timer=setTimeout(()=>{
+      show(frame+1);
+      scheduleFrame();
+    },Number(scene.dataset.duration)*1000);
   }
   function play(value) {
-    clearInterval(timer);
     active=value;
     toggle.textContent=value?labels.pause:labels.play;
     toggle.setAttribute('aria-pressed',String(value));
     scene.classList.toggle('playing',value);
-    if(value && frames.length>1) timer=setInterval(()=>show(frame+1),Number(scene.dataset.duration)*1000);
+    scheduleFrame();
   }
-  document.querySelector('#next')?.addEventListener('click',()=>show(frame+1));
-  dots.forEach((dot,index)=>dot.addEventListener('click',()=>show(index)));
+  function playWithoutStream() {
+    if (scene.dataset.moment && frame===frames.length-1) show(0);
+    voice?.pause();
+    play(true);
+    document.querySelector('#stream-status').textContent=labels.silent;
+  }
+  document.querySelector('#next')?.addEventListener('click',()=>{show(frame+1);scheduleFrame();});
+  dots.forEach((dot,index)=>dot.addEventListener('click',()=>{show(index);scheduleFrame();}));
   toggle.addEventListener('click',()=>{
-    if(!audio) {if(!active) voice?.pause();play(!active);return;}
+    if(!audio) {
+      if(!active) {
+        if (scene.dataset.moment && frame===frames.length-1) show(0);
+        voice?.pause();
+      }
+      play(!active);
+      return;
+    }
     if(active) {
       audio.pause();
       play(false);
       return;
     }
+    if (audio.dataset.stream==='true' && !navigator.onLine) {
+      playWithoutStream();
+      return;
+    }
     audio.play().catch(()=>{
-      if(audio.dataset.stream==='true') {
-        play(true);
-        document.querySelector('#stream-status').textContent=labels.silent;
-      } else toggle.textContent=labels.noAudio;
+      if(audio.dataset.stream==='true') playWithoutStream();
+      else toggle.textContent=labels.noAudio;
     });
   });
-  audio?.addEventListener('play',()=>{voice?.pause();play(true);});
+  audio?.addEventListener('play',()=>{
+    if (audio.currentTime<.1 && scene.dataset.moment && frame===frames.length-1) show(0);
+    voice?.pause();
+    play(true);
+  });
   audio?.addEventListener('pause',()=>play(false));
   audio?.addEventListener('ended',()=>play(false));
   voice?.addEventListener('play',()=>{audio?.pause();play(false);});
@@ -145,7 +132,7 @@ async function narrationForExport(day) {
   const voiceId = recording ? recording.voiceId : day.narrationVoice;
   const voiceName = recording ? recording.voiceName : day.narrationVoiceName;
   const model = recording ? recording.model : day.narrationModel;
-  return {audio, metadata:{file, voiceId, voiceName, model, mode:voiceId ? 'auto' : undefined}};
+  return {audio, metadata:{file, voiceId, voiceName, model, storyRevision:recording?.storyRevision, mode:voiceId ? 'auto' : undefined}};
 }
 
 function documentHTML(day, names, soundtrack, narration) {
@@ -173,11 +160,11 @@ function documentHTML(day, names, soundtrack, narration) {
 <body><header class="top"><span class="brand"><span class="mark">${stampSVG(imprint.feelings)}</span> ${t("Оттиск")}</span></header>
 <main style="padding-top:24px">
 ${sceneHTML(day,names,formatDate(day.date))}
-<div class="transport"><button id="play" class="primary" type="button" aria-pressed="false">${t("Воспроизвести")}</button>${names.length>1?`<button id="next" class="plain bordered">${t("Следующий кадр")}</button>`:''}<div class="track"><strong>${escape(music.track)}</strong>${rightsLabel}</div>${media}</div>
+<div class="transport"><button id="play" class="primary" type="button" aria-pressed="false">${t("Воспроизвести")}</button>${names.length>1 || imprint.moments?`<button id="next" class="plain bordered">${t("Следующий кадр")}</button>`:''}<div class="track"><strong>${escape(music.track)}</strong>${rightsLabel}</div>${media}</div>
 ${streamingDetails}
-<section class="notes"><div><h2>${t("Запись дня")}</h2><p class="story" lang="${storyLanguage(day.story)}">${escape(day.story)}</p>${voicePlayer}</div><div class="reading"><h2>${t("Как собрана сцена")}</h2><div class="mood-stamp">${stampSVG(imprint.feelings,{labels:true,title:t('Оттиск дня: ')+imprint.moodName})}</div>${rulesHTML(imprint)}<p class="hint">${numberFormat(imprint.duration,{maximumFractionDigits:1})} ${t("с на кадр по темпу музыки.")} ${escape(motionLine(imprint.feelings))} ${escape(placeLine(imprint))}</p></div></section>
+<section class="notes"><div><h2>${t("Запись дня")}</h2><p class="story" lang="${storyLanguage(day.story)}">${escape(day.story)}</p>${voicePlayer}</div><div class="reading"><h2>${t("Как собрана сцена")}</h2><div class="mood-stamp">${stampSVG(imprint.feelings,{labels:true,title:t('Оттиск дня: ')+imprint.moodName})}</div>${rulesHTML(imprint)}${imprint.moments?`<p class="hint">${escape(momentLine(imprint))}</p>`:''}<p class="hint">${numberFormat(imprint.duration,{maximumFractionDigits:1})} ${t("с на кадр по темпу музыки.")} ${escape(motionLine(imprint.feelings))} ${escape(placeLine(imprint))}</p></div></section>
 ${catalogCredit(music)}
-${contextPageHTML(imprint.context, imprint)}</main><script>(${offlineScene.toString()})(${JSON.stringify(controls).replace(/</g, '\\u003c')});(${weatherLayer.toString()})();</script></body></html>`;
+${contextPageHTML(imprint.context, imprint)}</main><script>(${offlineScene.toString()})(${JSON.stringify(controls).replace(/</g, '\\u003c')},(${applySceneMoment.toString()}));(${weatherLayer.toString()})();</script></body></html>`;
 }
 
 async function dayEntries(day, folder) {
@@ -217,8 +204,15 @@ async function dayEntries(day, folder) {
   }
   const voice = await narrationForExport(day);
   if (voice) entries.push([`${folder}/${voice.metadata.file}`,voice.audio]);
-  const {kind,track,url,analysis,origin,styleId,rights,sourceUrl,artist,license,licenseUrl,provider}=music;
-  const metadata={date:day.date,id:day.id,imprint:day.imprint,music:{kind,track,url,source:kind==='remote'?soundtrack:undefined,analysis,origin,styleId,rights,sourceUrl,artist,license,licenseUrl,provider},photos:names,frameOrigins:day.frameOrigins,narration:voice?.metadata,reading:day.reading};
+  const {kind,track,url,analysis,origin,styleId,rights,sourceUrl,artist,license,licenseUrl,provider,creatorUrl,catalogId}=music;
+  const metadata={
+    date:day.date,id:day.id,created:day.created,demo:day.demo,customTitle:day.customTitle,storyRevision:day.storyRevision,
+    imprint:day.imprint,reading:day.reading,frameOrigins:day.frameOrigins,narration:voice?.metadata,
+    music:{kind,track,url,source:kind==='remote'?soundtrack:undefined,analysis,origin,styleId,rights,
+      sourceUrl,artist,license,licenseUrl,provider,creatorUrl,catalogId,file:kind==='file'?soundtrack:undefined,
+      fileMetadata:fileMetadata(music.blob)},
+    photos:names,photoFiles:photos.map(fileMetadata)
+  };
   entries.push([`${folder}/story.txt`,day.story],[`${folder}/memory.json`,JSON.stringify(metadata,null,2)],[`${folder}/index.html`,documentHTML(day,names,soundtrack,voice?.metadata)]);
   return entries;
 }
@@ -237,8 +231,9 @@ async function download(days, filename) {
   }
   const ordered=[...days].sort((a,b)=>a.date.localeCompare(b.date)||a.created-b.created);
   const mood=foldDiary(ordered.map(day=>day.imprint.feelings));
+  entries.push(['ottisk-backup.json',JSON.stringify({format:'ottisk-archive',version:1,folders:[...folders]})]);
   entries.push(['index.html',`<!doctype html><html lang="${language}" style="${themeStyle(siteTokens(mood.state,{keep:mood.lead,keepSecond:mood.second}))}"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${t("Архив — Оттиск")}</title><link rel="stylesheet" href="assets/style.css"><body><main class="welcome"><h1>${t("Архив дней")}</h1><ul>${links.join('')}</ul></main></body></html>`]);
-  const url=URL.createObjectURL(await zip(entries));
+  const url=URL.createObjectURL(await writeZip(entries));
   const anchor=document.createElement('a');
   anchor.href=url;
   anchor.download=`${filename}.zip`;

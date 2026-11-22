@@ -191,7 +191,7 @@ export function mountNarrator(main, day, stopMusic, displayedStory = day.story) 
         if (disposed) return;
         if (!blob.type.startsWith('audio/') || !blob.size) throw Error(t('Не удалось получить звуковую дорожку.'));
         status.textContent=t('Готово. Озвучка будет в папке дня.');
-        await persist({voiceId,voiceName:voiceNames.get(voiceId),model:config.model,blob});
+        await persist({voiceId,voiceName:voiceNames.get(voiceId),model:config.model,blob,storyRevision:day.storyRevision});
         if (!disposed) setTrack();
       } else if (canUseDemo() && day.voiceRecording && !hasRecording()) {
         await persist(null);

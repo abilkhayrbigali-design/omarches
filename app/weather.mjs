@@ -31,7 +31,6 @@ export function weatherLayer() {
   const canvas = document.createElement('canvas');
   canvas.className = 'weather-precipitation';
   canvas.setAttribute('aria-hidden', 'true');
-  canvas.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:8;pointer-events:none';
   const ctx = canvas.getContext('2d');
   if (!ctx) {
     updateMood();

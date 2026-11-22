@@ -134,7 +134,8 @@ export function localFeelings(story) {
 const LEAD_DROP = new Set(('сегодня вчера потом затем утром вечером днем ночью мы я и а но было была был были это так еще уже ' +
   'когда пока наконец просто очень все всё тут там вот тогда сначала зато однако').split(' '));
 const TAIL_DROP = new Set(('в во на с со к ко по за из от до у о об под над при для без через и а но или что как где когда чтобы ' +
-  'мы я он она они ее её его их мне меня нам нас не ни же бы ли то это этот эта очень так уже еще ещё только пока сих пор').split(' '));
+  'мы я он она они ее её его их мне меня нам нас не ни же бы ли то это этот эта очень так уже еще ещё только пока сих пор ' +
+  'думал думала думали понял поняла поняли узнал узнала узнали').split(' '));
 const VERB = /(?:л|ла|ли|ло|лся|лась|лись|лось|ть|ться|тся|ешь|ете|ют|ут|ит|ят)$/;
 
 const TITLE_WORDS = {
@@ -145,34 +146,63 @@ const TITLE_WORDS = {
     new Set('мен және немесе бірақ да де та те үшін туралы қарай сияқты'.split(' '))]
 };
 
-function trimTitle(list, lang) {
-  const [leading, trailing] = TITLE_WORDS[lang];
-  const result = [...list];
-  while (result.length && leading.has(result[0].toLowerCase())) result.shift();
-  // Up to seven words, so a two-word name at the end («Mega Silkway») is not cut in half.
-  if (result.length > 7) result.length = 7;
-  while (result.length && trailing.has(result.at(-1).toLowerCase())) result.pop();
-  return result;
+const titleWords = text => text.match(/[\p{L}\p{N}]+(?:[-’'][\p{L}\p{N}]+)*/gu) ?? [];
+const dependentTitle = {
+  ru: /^(?:потому что|так как|даже если|хотя|если|несмотря на то что)(?: |$)/iu,
+  en: /^(?:because|although|even though|even if|if|unless)(?: |$)/iu,
+  kk: /^(?:өйткені|себебі|егер)(?: |$)/iu
+};
+
+export function validAutoTitle(title, lang) {
+  const list = titleWords(title);
+  return list.length >= 3 && list.length <= 7 && title.length <= 90
+    && !dependentTitle[lang].test(list.join(' '))
+    && !TITLE_WORDS[lang][1].has(list.at(-1).toLocaleLowerCase(locale(lang)));
 }
 
 export function localTitle(story, lang = storyLanguage(story)) {
   const [leading, trailing] = TITLE_WORDS[lang];
-  const clauses = String(story ?? '').split(/[.!?…\n;:,—–]+/u)
-    .map(clause => trimTitle(clause.match(/[\p{L}\p{N}]+(?:[-’'][\p{L}\p{N}]+)*/gu) || [], lang))
-    .filter(list => list.length >= 3);
+  const split = {ru: /\s+(?=(?:и потом|и наконец|но|зато)(?!\p{L}))/iu,
+    en: /\s+(?=and then\b|but\b|so\b)/iu, kk: /\s+(?=сосын|бірақ|содан кейін)/iu};
+  const clauses = String(story ?? '').split(/[.!?…\n;:,—–]+/u);
+  const fragments = new Set([...clauses,...clauses.flatMap(clause=>clause.split(split[lang]))]);
+  const complete = [...fragments].map(titleWords);
+  if (lang==='ru') {
+    for (const list of [...complete]) {
+      for (const [index,word] of list.entries()) {
+        if (word.toLowerCase()!=='и' || index<3 || list.length-index<4) continue;
+        const head=list[index+1].toLowerCase();
+        const action=leading.has(head) ? list[index+2] : head;
+        if (/(?:лась|лся|лись|ала|али|ила|или|ели|ал|ел|ил|ул|ёл|ыл)$/iu.test(action)) {
+          complete.push(list.slice(0,index),list.slice(index+1));
+        }
+      }
+    }
+  }
+  const lists = complete.map(list=>{
+    // Keep whole clauses. Stripping the day or pronoun from the start is safe as long
+    // as it leaves a meaningful phrase of at least three words.
+    while (list.length>3 && leading.has(list[0].toLocaleLowerCase(locale(lang)))) list.shift();
+    return list;
+  });
   let best = null;
-  for (const list of clauses) {
+  for (const list of lists) {
+    const title=list.join(' ');
+    if (!validAutoTitle(title,lang)) continue;
     const lower = list.map(word => word.toLowerCase().replaceAll('ё', 'е'));
     const content = lower.filter(word => word.length > 2 && !trailing.has(word) && !leading.has(word));
     const verbs = lang === 'ru' ? content.filter(word => VERB.test(word)).length : 0;
     const vivid = lower.filter((word, index) => cueHits(lower, index).length).length;
     const score = (content.length - verbs) + vivid * .7 - verbs * .6 - Math.abs(list.length - 4) * .25;
-    if (!best || score > best.score) best = {list, score};
+    if (!best || score > best.score) best = {title, score};
   }
-  const fallback = trimTitle(String(story ?? '').match(/[\p{L}\p{N}]+(?:[-’'][\p{L}\p{N}]+)*/gu) || [], lang).slice(0, 5);
-  const chosen = best?.list || fallback;
-  if (!chosen.length) return inLanguage(lang, 'День без слов');
-  const title = chosen.join(' ');
+  if (!best) {
+    const short=lists.find(list=>list.length<3 && list.length && !trailing.has(list.at(-1).toLowerCase()));
+    const subject=(short || titleWords(String(story ?? '')).filter(word=>!trailing.has(word.toLowerCase()) && !leading.has(word.toLowerCase())).slice(0,1)).join(' ');
+    const fallback = inLanguage(lang,'Этот день: $1').replace('$1',()=>subject);
+    return validAutoTitle(fallback,lang) ? fallback : inLanguage(lang,'День без слов');
+  }
+  const {title} = best;
   return title[0].toLocaleUpperCase(locale(lang)) + title.slice(1);
 }
 
