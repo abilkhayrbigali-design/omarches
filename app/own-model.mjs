@@ -118,7 +118,8 @@ async function loadModel() {
   return {...meta, sparse};
 }
 
-const NAMES = Object.fromEntries(ORDER.map(id => [id, feelingName(id).toLowerCase()]));
+// The sentence says «модель вывела …», so the names stand in the accusative: only «тишина» changes.
+const NAMES = Object.fromEntries(ORDER.map(id => [id, id === 'quiet' ? 'тишину' : feelingName(id).toLowerCase()]));
 // Small words carry weight inside the model but explain nothing to the reader.
 const STOP = new Set(('после перед под над при для без через про как так что чтобы где куда когда пока потом тоже также ' +
   'это этот эта эти тот там тут его её ее их мой моя мне меня нас нам вас они она оно был была было были будет есть ' +

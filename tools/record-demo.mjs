@@ -165,10 +165,10 @@ await click('textarea[name=story]');
 // A long entry is typed faster, so the step takes about the same time for any text.
 await page.keyboard.type(day.story, {delay: Math.round(Math.max(8, Math.min(30, 6000 / day.story.length)))});
 await pause(.8);
-say('Автор сам решает, читать ли запись с помощью ИИ');
+say('Запись читает собственная модель «Оттиска» на устройстве; OpenAI — только по желанию автора');
 if (await page.isVisible('#ai-consent')) {
   await point('#ai-consent');
-  if (!day.ai) await click('input[name=useAI]');
+  if (day.ai) await click('input[name=useAI]');
 }
 await pause(3.2);
 say('Шаг 2. Фотографии дня');
@@ -205,7 +205,7 @@ if (day.song.catalog) {
   await page.setInputFiles('input[name=audio]', songFile);
   await pause(2.6);
 }
-say(day.ai ? 'Модель читает запись: числа настроения и название папки дня' : 'Дневник читает запись: числа настроения и название папки дня');
+say(day.ai ? 'Модель OpenAI читает запись: числа настроения и название папки дня' : 'Модель «Оттиска» читает запись: числа настроения и название папки дня');
 await click('#day-form [type=submit]');
 await page.waitForSelector('.memory', {timeout: 60000});
 const dayTitle = await page.textContent('#day-heading');
@@ -242,7 +242,7 @@ await slide('calm', .04);
 await top();
 await pause(3.2);
 if (day.ai && await page.isVisible('#reread')) {
-  say('Одна кнопка возвращает прочтение модели');
+  say('Одна кнопка возвращает прочтение модели OpenAI');
   await click('#reread');
   await page.waitForFunction(() => document.querySelector('#reading-source').textContent.startsWith('Запись прочитала'), null, {timeout: 60000});
 } else {

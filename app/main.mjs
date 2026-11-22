@@ -133,7 +133,7 @@ function sourceLine(day) {
   const who=reading.source==='ai' ? `Запись прочитала модель ${escape(reading.model)}.`
     : reading.source==='own' ? 'Запись прочитала модель «Оттиска» на этом устройстве.'
     : reading.source==='manual' ? 'Числа поправлены вручную.'
-    : reading.fallback ? 'Модель не ответила, поэтому настроение оценил словарь на устройстве.'
+    : reading.fallback ? 'OpenAI не ответил, поэтому настроение оценил словарь на устройстве.'
     : 'Настроение оценил словарь на устройстве.';
   return `${who}${['ai','own'].includes(reading.source) && reading.reason ? ' '+escape(reading.reason) : ''}`;
 }
@@ -268,7 +268,7 @@ function renderDay(day, photo, fileURL) {
     reread.disabled=false;
     reread.textContent='Прочитать запись через OpenAI';
     if (!main.contains(reread)) return;
-    if (reading.source!=='ai') { announce('Модель не ответила. Числа остались прежними.'); return; }
+    if (reading.source!=='ai') { announce('OpenAI не ответил. Числа остались прежними.'); return; }
     day.reading=reading;
     for (const input of tune.querySelectorAll('input')) {
       input.value=reading.feelings[input.name];
@@ -339,7 +339,7 @@ function renderDay(day, photo, fileURL) {
     await keep();
     await saveRecording(day.id,null).catch(()=>{});
     render();
-    announce(model.available?'Текст сохранён. Настроение пересчитал словарь; модель прочитает запись по кнопке «Прочитать запись через OpenAI».':'Текст сохранён, настроение пересчитано.');
+    announce(model.available?'Текст сохранён, его заново прочитала модель «Оттиска». OpenAI прочитает запись по кнопке «Прочитать запись через OpenAI».':'Текст сохранён, его заново прочитала модель «Оттиска».');
   });
   main.querySelector('#delete-day')?.addEventListener('click',async()=>{
     const sure=await ask(`Удалить день «${day.imprint.title}»?`,'Текст, кадры, песня и озвучка исчезнут из этого браузера. Вернуть их будет нельзя.');
@@ -458,9 +458,8 @@ async function advanceStep() {
 function paintReadingChoice() {
   document.querySelector('#ai-consent').hidden=!model.available;
   document.querySelector('#reading-hint').textContent=model.available
-    ? 'С галочкой при сборке воспоминания текст записи отправится в OpenAI: модель оценит настроение дня и назовёт папку. Без галочки текст останется на устройстве, а настроение оценит встроенный словарь.'
-    : model.server && !model.hosted ? 'Настроение дня оценит встроенный словарь на устройстве. Чтобы запись читала модель, подключите ключ OpenAI по инструкции проекта и перезапустите дневник.'
-    : 'Настроение дня оценит встроенный словарь на устройстве: в этой версии текст никуда не отправляется.';
+    ? 'Без галочки запись читает собственная модель «Оттиска» прямо на этом устройстве, и текст никуда не уходит. С галочкой текст отправится в OpenAI: её модель оценит настроение дня и назовёт папку.'
+    : 'Настроение дня оценит собственная модель «Оттиска» прямо на этом устройстве: текст никуда не отправляется.';
 }
 // Show what is already known at once, then check again in case the key changed.
 async function showReadingChoice() {
@@ -527,7 +526,7 @@ form.addEventListener('submit',async event=>{
     goToStep(1);
     editor.close();
     location.hash=href(day.id);
-    announce(reading.fallback?'Папка дня сохранена. Модель не ответила, настроение оценил словарь.':'Папка дня сохранена.');
+    announce(reading.fallback?'Папка дня сохранена. OpenAI не ответил, запись прочитала модель «Оттиска».':'Папка дня сохранена.');
   } catch (error) {
     alert.textContent=error instanceof DOMException?'Браузер не смог сохранить запись. Проверьте доступное место и режим браузера.':error.message;
     alert.hidden=false;
@@ -573,8 +572,8 @@ if (results[2].status==='fulfilled') {
 sortDays();
 if (results[3].status==='fulfilled') model=results[3].value;
 // A copy opened without the local server still keeps a diary, but says plainly what it cannot do.
-if (model.hosted) document.querySelector('footer span:last-child').textContent=(model.available?'Версия в интернете: запись читает модель, если автор разрешит.':'Версия в интернете: настроение оценивает словарь.')+' Картинки по рассказу и новая озвучка создаются при запуске на компьютере. Записи хранятся в этом браузере';
-else if (!model.server) document.querySelector('footer span:last-child').textContent='Версия без сервера: настроение оценивает словарь, генерация картинок и новая озвучка недоступны. Записи хранятся в этом браузере';
+if (model.hosted) document.querySelector('footer span:last-child').textContent='Версия в интернете: запись читает собственная модель «Оттиска» на устройстве. Картинки по рассказу и новая озвучка создаются при запуске на компьютере. Записи хранятся в этом браузере';
+else if (!model.server) document.querySelector('footer span:last-child').textContent='Версия без сервера: запись читает собственная модель «Оттиска» на устройстве, генерация картинок и новая озвучка недоступны. Записи хранятся в этом браузере';
 render();
 if (results.some(result=>result.status==='rejected') || (stored.status==='fulfilled' && stored.value.failed)) announce('Не удалось загрузить часть дневника.');
 window.addEventListener('hashchange',()=>render(true));
