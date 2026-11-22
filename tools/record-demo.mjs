@@ -223,9 +223,12 @@ await glide('#day-stamp');
 await pause(3.6);
 await glide('#day-rules');
 await pause(3.6);
+say('Песня тоже разобрана: темп, лад и то, как она сдвинула числа');
+await glide('#music-line');
+await pause(3.6);
 
 // 4. The numbers can be corrected; the scene and the site follow at once.
-say('Числа можно поправить: сцена и весь сайт меняются сразу');
+say('Числа можно поправить: кадр, сцена и весь сайт меняются сразу');
 await click('.tune summary');
 await pause(.8);
 const slide = async (name, value) => {
