@@ -1,7 +1,8 @@
 // Reading a story: the language model behind the diary's own server (the local one,
 // or the small public one of the hosted copy) when the author allows it, otherwise
-// the dictionary that never leaves the device.
+// the diary's own model on the device, and the dictionary as the last resort.
 import {cleanFeelings, localReading, localTitle} from './feelings.mjs';
+import {ownReading} from './own-model.mjs';
 
 export async function readingStatus() {
   try {
@@ -14,8 +15,14 @@ export async function readingStatus() {
   return {available: false, model: '', server: false, hosted: false};
 }
 
+// Without the outside model, the diary's own model reads on the device; the dictionary
+// answers only when its weights cannot be loaded.
+async function readHere(story) {
+  return await ownReading(story) ?? localReading(story);
+}
+
 export async function readStory(story, useModel) {
-  if (!useModel) return localReading(story);
+  if (!useModel) return readHere(story);
   try {
     const response = await fetch('/api/reading', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -31,6 +38,6 @@ export async function readStory(story, useModel) {
         reason: String(data.reason ?? '').slice(0, 240), model: String(data.model ?? ''), source: 'ai'
       };
     }
-  } catch { /* Offline or timed out: the dictionary answers instead. */ }
-  return {...localReading(story), fallback: true};
+  } catch { /* Offline or timed out: the reader on the device answers instead. */ }
+  return {...await readHere(story), fallback: true};
 }
