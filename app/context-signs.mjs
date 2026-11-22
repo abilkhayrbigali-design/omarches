@@ -26,7 +26,7 @@ const WIDE = 1.66;
 // Classes: l* are lines, f* flat fills, k a hole. a/b are the holiday's two colours, p is pale light.
 const STYLE = `<style>
 .d-ctx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2;overflow:hidden;mix-blend-mode:screen;opacity:calc(.92 - var(--quiet,0) * .3)}
-.d-ctx .d-la,.d-ctx .d-lb,.d-ctx .d-lp,.d-ctx .d-lw{fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.d-ctx .d-la,.d-ctx .d-lb,.d-ctx .d-lp,.d-ctx .d-lw{fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 .d-ctx .d-la{stroke:var(--d-a)}.d-ctx .d-lb{stroke:var(--d-b)}.d-ctx .d-lp{stroke:var(--d-p)}.d-ctx .d-lw{stroke:var(--d-w)}
 .d-ctx .d-fa{fill:var(--d-a);fill-opacity:.34}.d-ctx .d-fb{fill:var(--d-b);fill-opacity:.34}.d-ctx .d-fp{fill:var(--d-p);fill-opacity:.3}.d-ctx .d-fw{fill:var(--d-w);fill-opacity:.26}
 .d-ctx .d-ga{fill:var(--d-a)}.d-ctx .d-gb{fill:var(--d-b)}.d-ctx .d-gp{fill:var(--d-p)}
@@ -203,8 +203,8 @@ const GLYPHS = {
 // Placement. Points are in percent of the scene; the words keep the lower left
 // (or the upper left when the scene puts them in the grid) and the dots the lower right.
 const SLOTS = {
-  scene: {sky: [84, 22, 19], spots: [[60, 12], [73, 9], [93, 40], [90, 63], [66, 30], [54, 7], [79, 46]], size: 13},
-  grid: {sky: [90, 22, 14], spots: [[92, 45], [90, 66], [58, 80], [72, 74], [44, 84], [84, 84]], size: 10.5},
+  scene: {sky: [84, 22, 19], spots: [[60, 12], [73, 9], [93, 40], [90, 63], [66, 30], [54, 7], [79, 46]], size: 16},
+  grid: {sky: [90, 22, 14], spots: [[92, 45], [90, 66], [58, 80], [72, 74], [44, 84], [84, 84]], size: 12.5},
   card: {sky: [80, 26, 30], spots: [[50, 22], [88, 66], [28, 18], [64, 52]], size: 21}
 };
 const KITS = {
