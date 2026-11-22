@@ -362,8 +362,127 @@ export function siteTokens(feelings, {hue, keep, keepSecond} = {}) {
     lines: round2(f.tension * .1),
     pageGrain: round2(clamp(f.warmth * .1 + f.sadness * .04, 0, .12)),
     // How long the site takes to change its mood; pointer feedback stays instant.
-    tempo: round2(clamp(.42 - .14 * f.festive + .22 * f.quiet, .28, .7))
+    tempo: round2(clamp(.42 - .14 * f.festive + .22 * f.quiet, .28, .7)),
+    // Air: solitude and quiet open the page up, a festive or tense day packs it tighter.
+    air: round2(clamp(1 + .3 * f.solitude + .16 * f.quiet - .16 * f.festive - .12 * f.tension, .82, 1.4)),
+    // Rules between sections: hard on a tense day, barely there on a calm or sad one.
+    edge: round2(clamp(.15 + .15 * f.tension + .03 * f.joy - .05 * f.calm - .04 * f.sadness, .08, .32)),
+    // The page light: joy keeps it above, sadness lets it sink under the page;
+    // warmth pulls it into the corner, solitude leaves it far and off-centre.
+    glowX: Math.round(clamp(62 + 26 * (f.warmth - f.solitude), 30, 90)),
+    glowY: Math.round(clamp(-10 + 125 * clamp(f.sadness - .5 * f.joy), -10, 112)),
+    // Sadness and solitude close the edges of the page, as they do on the frame.
+    vignette: round2(clamp(.5 * f.sadness + .3 * f.solitude - .25 * f.joy, 0, .5)),
+    textLight: Math.round(clamp(92 + 3 * f.joy + f.festive - 5 * f.sadness - 2 * f.solitude, 86, 96)),
+    // The author's text: slow, open lines on a quiet day, a tight column on a tense one.
+    leading: round2(clamp(1.68 + .14 * f.quiet + .08 * f.calm - .16 * f.tension - .06 * f.festive, 1.5, 1.9)),
+    measure: Math.round(clamp(62 - 9 * f.solitude - 4 * f.quiet + 5 * f.festive, 50, 68)),
+    motion: motionTokens(f)
   };
+}
+
+// ---------------------------------------------------------------------------
+// Motion. The four pairs decide how things move, on the scene and on the site,
+// the same way they decide colour and form:
+//   Праздник ↔ Тишина    energy: how fast, and how soon the next element follows;
+//   Покой ↔ Напряжение   character: a long soft settle, or a hard snap along the grid;
+//   Радость ↔ Грусть     direction and weight: joy rises and overshoots, sadness sinks, heavy;
+//   Тепло ↔ Уединение    distance: warmth arrives together and comes closer,
+//                         solitude one by one, and the frame steps back.
+// The curve is a damped spring (stiffness, damping ratio, mass) sampled into a CSS
+// linear() easing, so ordinary transitions and keyframes move like that spring.
+function springCurve(stiffness, ratio, mass) {
+  const w = Math.sqrt(stiffness / mass);
+  const at = t => {
+    if (Math.abs(ratio - 1) < .01) return 1 - Math.exp(-w * t) * (1 + w * t);
+    if (ratio < 1) {
+      const wd = w * Math.sqrt(1 - ratio * ratio);
+      return 1 - Math.exp(-ratio * w * t) * (Math.cos(wd * t) + ratio * w / wd * Math.sin(wd * t));
+    }
+    const root = Math.sqrt(ratio * ratio - 1);
+    const slow = w * (ratio - root);
+    const fast = w * (ratio + root);
+    return 1 - (fast * Math.exp(-slow * t) - slow * Math.exp(-fast * t)) / (fast - slow);
+  };
+  // The spring has settled once it stays within one percent of rest.
+  let settle = .1;
+  for (let t = 4; t > .1; t -= 1 / 120) if (Math.abs(at(t) - 1) > .01) { settle = t; break; }
+  const count = ratio < .95 ? 32 : 20;
+  const stops = Array.from({length: count + 1}, (_, index) => index === count ? 1 : Math.round(at(settle * index / count) * 1000) / 1000);
+  return {settle, peak: Math.max(...stops), easing: `linear(${stops.join(',')})`};
+}
+
+const motionCache = new Map();
+export function motionTokens(feelings) {
+  const key = IDS.map(id => feelings[id] ?? 0).join();
+  if (motionCache.has(key)) return motionCache.get(key);
+  const f = cleanFeelings(feelings);
+  const energy = f.festive - f.quiet;
+  const press = clamp(f.tension - f.calm);
+  const valence = f.joy - f.sadness;
+  const near = f.warmth - f.solitude;
+  // Character. Tension stiffens the spring; quiet, calm and sadness slacken it.
+  const stiffness = Math.round(clamp(170 + 450 * f.tension + 130 * f.festive + 40 * f.joy - 80 * f.quiet - 50 * f.sadness - 40 * f.calm, 60, 700));
+  // Weight. A sad or lonely day is slow to start and slow to stop.
+  const mass = round2(clamp(1 + .9 * f.sadness + .5 * f.solitude + .25 * f.quiet - .3 * f.festive - .15 * f.joy, .7, 2.4));
+  // Below one the spring overshoots (a festive, glad day bounces); above one it
+  // creeps to rest (a calm day). Tension pulls it to exactly one: a snap, no bounce, no tail.
+  const loose = clamp(1 - .5 * f.festive - .3 * f.joy + .45 * f.calm + .3 * f.quiet + .35 * f.sadness + .1 * f.solitude, .55, 1.7);
+  const ratio = round2(loose + (1 - loose) * clamp(f.tension * 1.2));
+  const curve = springCurve(stiffness, ratio, mass);
+  const settle = round2(clamp(curve.settle, .16, 1.3));
+  const wipe = f.tension >= .5 && press > 0;
+  const travel = clamp(1 + .5 * energy, .5, 1.5) * (1 - .8 * press);
+  const rise = Math.round((valence < 0 ? -1 : 1) * (8 + 22 * Math.abs(valence)) * travel);
+  const camY = Math.round(-valence * 14) / 10;
+  const tokens = {
+    stiffness, ratio, mass, settle, easing: curve.easing, bounce: round2(curve.peak - 1),
+    // Feedback and routine changes take a share of the settle time, inside the usual limits.
+    quick: round2(clamp(settle * .5, .12, .45)),
+    // The gap before the next sibling: rapid on a festive or tense day, long when alone.
+    step: round2(clamp(.07 - .04 * f.festive - .05 * f.tension + .05 * f.solitude + .035 * f.quiet + .02 * f.sadness - .015 * f.warmth, .02, .16)),
+    // Where elements come from. Joy: from below, upwards. Sadness: from above, sinking.
+    // Tension: from the side, along the grid. Warmth: from a little smaller, coming closer.
+    rise, slide: Math.round(34 * press),
+    grow: round2(1 - clamp(.07 * f.warmth + .04 * f.festive - .05 * f.solitude - .03 * f.tension, 0, .09)),
+    // A calm, quiet title comes into focus; a tense one is uncovered by a hard-edged wipe.
+    soft: Math.round(clamp(9 * f.calm + 7 * f.quiet - 12 * f.tension - 6 * f.festive - 2, 0, 10)),
+    wipe,
+    // How a photograph answers the pointer: how far it leans in and how long it takes.
+    hoverZoom: Math.round(clamp(1.02 + .035 * f.festive + .02 * f.joy + .012 * f.warmth - .012 * f.quiet - .008 * f.solitude, 1.012, 1.07) * 1000) / 1000,
+    hoverTime: round2(clamp(.45 - .2 * f.festive - .25 * f.tension + .3 * f.quiet + .2 * f.calm + .15 * f.sadness, .16, .9)),
+    pressDepth: Math.round(clamp(1 + 2 * f.tension + 1.5 * f.festive - f.quiet, 1, 4)),
+    // The camera while a memory plays. Warmth moves in, solitude steps back; joy lifts
+    // the picture, sadness lets it sink; on a tense day it moves in jerks.
+    camBack: near < -.08 ? 1 : 0, camY, camPad: round2(Math.abs(camY) * .02 + .004),
+    camEase: wipe ? `steps(${Math.round(5 + 5 * f.tension)},end)` : f.festive >= .5 ? 'cubic-bezier(.16,1,.3,1)' : 'cubic-bezier(.45,0,.55,1)',
+    // The page light breathes while the memory plays.
+    ambient: Math.round(clamp(9 - 5 * f.festive - 3 * f.tension + 5 * f.quiet + 2 * f.calm, 3, 16) * 10) / 10,
+    swell: round2(clamp(.1 + .25 * f.festive + .12 * f.joy + .1 * f.warmth - .1 * f.quiet, .04, .4))
+  };
+  if (motionCache.size > 300) motionCache.clear();
+  motionCache.set(key, tokens);
+  return tokens;
+}
+
+// The same rule in words, for the block that explains a day.
+export function motionLine(feelings) {
+  const m = motionTokens(feelings);
+  const seconds = value => String(value).replace('.', ',') + ' с';
+  const spring = m.bounce >= .02 ? 'Пружина лёгкая, с отскоком'
+    : m.ratio >= 1.15 ? 'Пружина мягкая и тяжёлая, без отскока'
+    : m.stiffness >= 380 ? 'Пружина жёсткая, без отскока' : 'Пружина ровная, без отскока';
+  const from = [];
+  if (m.slide >= 6) from.push('входят сбоку, вдоль сетки');
+  if (m.rise >= 6) from.push('поднимаются снизу');
+  if (m.rise <= -6) from.push('опускаются сверху');
+  if (m.grow <= .97) from.push('приближаются');
+  const title = m.wipe ? 'заголовок открывается резкой шторкой' : m.soft >= 3 ? 'заголовок выходит из расфокуса' : '';
+  const arrive = [from.length ? 'элементы ' + from.join(' и ') : 'элементы проявляются на месте', title].filter(Boolean).join(', ');
+  const camera = (m.camBack ? 'кадр отдаляется' : 'кадр приближается')
+    + (m.camY <= -.3 ? ' и плывёт вверх' : m.camY >= .3 ? ' и опускается' : '') + (m.wipe ? ', рывками' : '');
+  return `${spring}: всё встаёт на место за ${seconds(m.settle)}, следующий элемент через ${seconds(m.step)}. `
+    + `${arrive[0].toUpperCase()}${arrive.slice(1)}. В показе ${camera}.`;
 }
 
 // ---------------------------------------------------------------------------

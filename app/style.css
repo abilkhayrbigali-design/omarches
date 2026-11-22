@@ -38,12 +38,27 @@
   --backdrop:#0b0c08e0;
   /* Feedback to a pointer is always quick; --tempo paces only the change of mood. */
   --fast:.12s;
+  /* How things move: one spring per mood (motionTokens). Праздник ↔ Тишина sets the
+     speed, Покой ↔ Напряжение the character, Радость ↔ Грусть the direction,
+     Тепло ↔ Уединение the distance. */
+  --spring:cubic-bezier(.2,.8,.2,1);--settle:.5s;--quick:.26s;--step:.07s;--lead:0s;
+  --rise:8px;--slide:0px;--grow:1;--soft:0px;--wipe:-20%;--title-ghost:0;
+  --hover-zoom:1.02;--hover-time:.45s;--press:1px;
+  --cam-back:0;--cam-y:0%;--cam-pad:0;--cam-ease:ease;--ambient:9s;--swell:.1;
+  /* The page itself: air between sections, where the light sits, how far the edges close, the reading column. */
+  --air:1;--glow-x:85%;--glow-y:-10%;--vignette:0;--leading:1.7;--measure:62ch;
   font: 100%/1.5 var(--sans);
   font-optical-sizing:auto;
   background:var(--paper);
   color:var(--text);
-  transition:background-color var(--tempo) ease,color var(--tempo) ease;
+  scrollbar-color:var(--raise) var(--paper);
+  transition:background-color var(--tempo) ease,color var(--tempo) ease,--glow-x var(--tempo) ease,--glow-y var(--tempo) ease,--vignette var(--tempo) ease;
 }
+/* Registered so the page light travels, not jumps, when the mood changes. */
+@property --glow-x{syntax:"<percentage>";inherits:true;initial-value:85%}
+@property --glow-y{syntax:"<percentage>";inherits:true;initial-value:-10%}
+@property --vignette{syntax:"<number>";inherits:true;initial-value:0}
+::selection{background:var(--accent);color:var(--on-accent)}
 :root[data-face=grotesk]{--display:var(--grotesk)}
 @font-face{font-family:"Noto Serif";src:url("./media/title.woff2") format("woff2");font-display:swap}
 @font-face{font-family:"Adwaita Sans";src:url("./media/sans.woff2") format("woff2");font-weight:100 900;font-display:swap}
@@ -53,7 +68,8 @@ body{margin:0;min-height:100vh;position:relative;isolation:isolate}
 /* Site-wide layers use the same vocabulary as a memory, at a lower volume:
    a glow in the leading colour, a grid for tension, film grain for warmth. */
 body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:
-  radial-gradient(120% 70% at 85% -10%,var(--glow),transparent 60%),
+  radial-gradient(120% 70% at var(--glow-x) var(--glow-y),var(--glow),transparent 60%),
+  radial-gradient(130% 105% at 50% 42%,transparent 52%,hsl(226 40% 4% / var(--vignette))),
   repeating-linear-gradient(0deg,hsl(0 0% 100% / var(--lines)) 0 1px,transparent 1px 56px),
   repeating-linear-gradient(90deg,hsl(0 0% 100% / var(--lines)) 0 1px,transparent 1px 56px)}
 body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:var(--page-grain);background-image:url("./media/grain.webp");mix-blend-mode:screen}
@@ -78,7 +94,7 @@ nav,.archive-actions{display:flex;align-items:center;gap:24px}
   transition:background-color var(--fast) ease,color var(--fast) ease,border-color var(--fast) ease,transform var(--fast) ease,border-radius var(--tempo) ease}
 .primary{background:var(--accent);color:var(--on-accent);font-weight:620}
 .primary:hover{background:var(--accent-hi)}
-.primary:active,.plain:active{transform:translateY(1px)}
+.primary:active,.plain:active{transform:translateY(var(--press))}
 :root[data-view=day] #compose{background:none;color:var(--text);border-color:var(--edge)}
 :root[data-view=day] #compose:hover{border-color:var(--text)}
 .plain{color:var(--text);background:none}
@@ -104,7 +120,7 @@ nav,.archive-actions{display:flex;align-items:center;gap:24px}
 .frames{position:absolute;inset:var(--inset);overflow:hidden;border-radius:calc(var(--radius) * .5)}
 .frame{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 57%;opacity:0;transform:scale(1.016);
   filter:contrast(var(--contrast)) saturate(var(--filter-sat)) sepia(var(--sepia)) brightness(var(--bright));
-  transition:opacity var(--fade) ease,transform .55s ease}
+  transition:opacity var(--fade) ease,transform var(--hover-time) var(--spring)}
 .frame.visible{opacity:1}
 /* The treatment of the picture (strokes, planes, long exposure) comes first, the grading after it. */
 .treat{position:absolute;width:0;height:0}
@@ -151,7 +167,8 @@ nav,.archive-actions{display:flex;align-items:center;gap:24px}
 
 .memory{display:flex;align-items:flex-end;min-height:clamp(400px,48vw,620px);color:var(--on-photo)}
 .featured{display:grid;align-items:end;min-height:clamp(345px,39vw,520px)}
-.featured:hover .frame{transform:scale(1.035)}
+/* A photograph answers the pointer in its own day's character: a festive one leans in far and fast, a quiet one barely stirs. */
+.featured:hover .frame{transform:scale(calc(1.016 * var(--hover-zoom)))}
 .scene-text,.featured-text{position:relative;z-index:5;max-width:min(800px,91%);text-shadow:0 1px 16px hsl(var(--hue) 40% 4% / .6)}
 .scene-text{padding:44px clamp(23px,5vw,67px) 67px}
 .featured-text{padding:36px clamp(24px,5vw,67px) 45px}
@@ -181,8 +198,14 @@ nav,.archive-actions{display:flex;align-items:center;gap:24px}
 .featured:hover .feature-action{background:var(--scene-accent);color:var(--ink)}
 
 /* Playing a memory: the music's tempo sets the time of a frame. */
-.playing .frame.visible{animation:drift var(--dwell) ease both}
-@keyframes drift{from{transform:scale(1.016)}to{transform:scale(var(--drift))}}
+/* The camera: warmth moves in, solitude steps back; joy lifts the picture, sadness lets it sink; a tense day moves in jerks. */
+.playing .frame.visible{animation:drift var(--dwell) var(--cam-ease) both}
+@keyframes drift{
+  from{transform:translateY(0%) scale(calc(1.016 + var(--cam-pad) + var(--cam-back) * (var(--drift) - 1.016)))}
+  to{transform:translateY(var(--cam-y)) scale(calc(1.016 + var(--cam-pad) + (1 - var(--cam-back)) * (var(--drift) - 1.016)))}}
+/* The light of the page breathes with the memory, at the pace of its mood. */
+:root:has(.memory.playing) body::before{animation:page-breathe var(--ambient) ease-in-out infinite alternate}
+@keyframes page-breathe{to{opacity:calc(1 - var(--swell))}}
 .playing .wash{animation:pulse calc(var(--dwell) / 2) ease-in-out infinite alternate}
 @keyframes pulse{to{opacity:calc(var(--wash) * 3.2)}}
 .playing .m-festive line{animation:streak calc(var(--dwell) * .55) linear infinite}
@@ -206,7 +229,7 @@ nav,.archive-actions{display:flex;align-items:center;gap:24px}
 .mood-stamp .stamp{width:100%;height:auto;max-width:560px}
 
 /* The diary as a whole. */
-.diary-mood{display:grid;grid-template-columns:minmax(300px,1fr) 1.1fr;gap:clamp(20px,4vw,56px);align-items:center;padding:60px 0 52px;border-bottom:1px solid var(--edge)}
+.diary-mood{display:grid;grid-template-columns:minmax(300px,1fr) 1.1fr;gap:clamp(20px,4vw,56px);align-items:center;padding:calc(60px * var(--air)) 0 calc(52px * var(--air));border-bottom:1px solid var(--edge)}
 .mood-text h2{font-size:clamp(1.9rem,3.4vw,2.9rem);margin-bottom:10px}
 .mood-line{color:var(--muted);line-height:1.5;margin-bottom:18px;max-width:60ch}
 .diary-mood .hint{margin-top:16px;max-width:62ch}
@@ -217,13 +240,14 @@ nav,.archive-actions{display:flex;align-items:center;gap:24px}
 .pole b{font:400 1.3em/1 var(--serif);font-variant-numeric:tabular-nums}
 .meter{position:relative;display:grid;grid-template-columns:1fr 1fr;height:8px;background:var(--well);border-radius:var(--r);overflow:hidden}
 .meter i{display:block;height:100%;width:calc(var(--v) * 100%);background:var(--c);transition:width .5s ease}
-.meter .to-a{justify-self:end}
+.meter .to-a{justify-self:end;transform-origin:100% 50%}
+.meter .to-b{transform-origin:0 50%}
 .meter::after{content:"";position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--edge)}
 .pair small{grid-column:1/-1;color:var(--muted);font-size:.8rem;letter-spacing:.01em;text-align:center}
 .delta{font-size:.76rem;letter-spacing:.01em;font-variant-numeric:tabular-nums;color:var(--muted);white-space:nowrap}
 .delta.up{color:var(--text)}
 
-.archive{padding:44px 0 70px;scroll-margin-top:24px}
+.archive{padding:calc(44px * var(--air)) 0 calc(70px * var(--air));scroll-margin-top:24px}
 .section-title{display:flex;justify-content:space-between;align-items:end;gap:18px;border-bottom:1px solid var(--edge);padding-bottom:17px;margin-bottom:21px}
 .section-title h2{font-size:clamp(2.2rem,4vw,3.35rem)}
 .section-title p{color:var(--muted);font-size:.92rem;margin-top:5px}
@@ -231,10 +255,15 @@ nav,.archive-actions{display:flex;align-items:center;gap:24px}
 input,textarea,select{color:var(--text);background:var(--well);border:1px solid var(--edge);border-radius:calc(var(--r) * .75);padding:.68rem .8rem;min-width:0;transition:background-color var(--tempo) ease,border-color var(--fast) ease}
 input::placeholder,textarea::placeholder{color:var(--muted);opacity:.85}
 input[type="search"]{width:min(21vw,240px);min-height:43px;font-size:.94rem}
-.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:30px 18px}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:calc(30px * var(--air)) calc(18px * var(--air))}
 .day-card{display:block;min-width:0}
-.thumb{aspect-ratio:1.59;border-radius:calc(var(--radius) * .6)}
-.day-card:hover .frame{transform:scale(1.055)}
+.thumb{aspect-ratio:1.59;border-radius:calc(var(--radius) * .6);transition:transform var(--hover-time) var(--spring)}
+/* The link stays still under the pointer; the picture inside moves the way its day moves:
+   up for joy, down for sadness, along the grid for tension. */
+.day-card:hover .thumb{transform:translate(calc(var(--slide) * -.1),calc(var(--rise) * -.12))}
+.day-card:hover .frame{transform:scale(calc(1.016 * var(--hover-zoom)))}
+.card-caption h3{text-decoration:underline 1px transparent;text-underline-offset:.2em;transition:text-decoration-color var(--quick) ease}
+.day-card:hover h3{text-decoration-color:var(--accent)}
 .mood-label{position:absolute;z-index:5;bottom:10px;left:10px;display:flex;align-items:center;gap:7px;font-size:.82rem;letter-spacing:.01em;color:var(--on-photo);background:hsl(var(--hue) 22% 8% / .86);border:1px solid hsl(0 0% 100% / .22);padding:4px 9px 4px 6px;border-radius:var(--r)}
 .mood-label .stamp{width:20px;height:20px;color:#fff}
 .mood-label .stamp .shape{fill:var(--scene-accent);stroke:none}
@@ -245,7 +274,7 @@ input[type="search"]{width:min(21vw,240px);min-height:43px;font-size:.94rem}
 .empty{grid-column:1/-1}
 footer{border-top:1px solid var(--edge);padding:19px 0 25px;display:flex;gap:10px;justify-content:space-between;color:var(--muted);font-size:.81rem}
 footer span:first-child{color:var(--text)}
-.day-toolbar{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;padding:22px 0}
+.day-toolbar{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;padding:calc(22px * var(--air)) 0}
 .day-actions{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto}
 .primary.danger{background:var(--danger);color:var(--ink)}
 #confirm{width:min(440px,calc(100% - 28px))}
@@ -259,14 +288,16 @@ footer span:first-child{color:var(--text)}
 .dot{border:none;background:transparent;width:28px;height:30px;padding:6px;display:grid;place-items:center}
 .dot:before{content:"";display:block;width:8px;height:8px;border-radius:50%;border:1px solid var(--on-photo);background:hsl(0 0% 0% / .45)}
 .dot[aria-pressed=true]:before{background:var(--scene-accent);border-color:var(--scene-accent)}
-.transport{padding:17px 0;display:flex;align-items:center;gap:18px;border-bottom:1px solid var(--edge)}
+.transport{padding:calc(17px * var(--air)) 0;display:flex;align-items:center;gap:18px;border-bottom:1px solid var(--edge)}
 .track{display:flex;flex-direction:column;gap:3px;overflow-wrap:anywhere}
 .track span{font-size:.85rem;color:var(--muted)}
 .transport audio,.transport>a{margin-left:auto;max-width:100%}
-.notes{display:grid;grid-template-columns:1.1fr 1fr;gap:7%;padding:34px 0 60px}
+.notes{display:grid;grid-template-columns:1.1fr 1fr;gap:calc(7% * var(--air));padding:calc(34px * var(--air)) 0 calc(60px * var(--air))}
 .notes h2{font-size:clamp(1.65rem,3vw,2.4rem);margin-bottom:14px}
 /* The diary text is the author's voice: serif, at reading size, in a reading measure. */
-.story{font-family:var(--serif);font-size:1.125rem;white-space:pre-wrap;line-height:1.7;max-width:62ch;margin-bottom:22px;overflow-wrap:anywhere}
+.story{font-family:var(--serif);font-size:1.125rem;white-space:pre-wrap;line-height:var(--leading);max-width:var(--measure);margin-bottom:22px;overflow-wrap:anywhere}
+/* On a tense day the small labels are set like a timetable: capitals, spaced. */
+:root[data-face=grotesk] :is(.eyebrow,.card-caption time,.section-title p,.reading dt),.memory[data-face=grotesk] .scene-text time,.featured[data-face=grotesk] .eyebrow{text-transform:uppercase;letter-spacing:.09em;font-size:.72rem}
 /* The analysis is secondary to the author's own words beside it. */
 .reading>h2{font-size:clamp(1.3rem,2vw,1.6rem);color:var(--muted)}
 .reading-source{color:var(--muted);font-size:.9rem;line-height:1.5;margin:6px 0 18px}
@@ -281,7 +312,7 @@ footer span:first-child{color:var(--text)}
 .tune output{grid-column:2;grid-row:1;font-variant-numeric:tabular-nums;color:var(--muted)}
 #reread{margin-bottom:12px}
 .reading dl{margin:6px 0 12px}
-.reading dl div{padding:11px 0;border-top:1px solid var(--edge);display:grid;grid-template-columns:67px 1fr;gap:12px;font-size:.91rem;line-height:1.45}
+.reading dl div{padding:11px 0;border-top:1px solid var(--edge);display:grid;grid-template-columns:86px 1fr;gap:12px;font-size:.91rem;line-height:1.45}
 .reading dd{margin:0;color:var(--muted)}
 .swatch{width:.74em;height:.74em;display:inline-block;border-radius:50%;background:hsl(var(--sample));border:1px solid hsl(0 0% 100% / .27)}
 dialog{width:min(600px,calc(100% - 28px));max-height:calc(100% - 30px);color:var(--text);background:var(--surface);border:1px solid var(--edge);border-radius:calc(var(--r) * 1.5);padding:23px 26px;box-shadow:0 16px 80px var(--shadow)}
@@ -341,7 +372,55 @@ form fieldset{margin:14px 0 12px;border:1px solid var(--edge);border-radius:var(
   .tune-grid{grid-template-columns:1fr}
   footer{font-size:.74rem}
 }
-@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+/* Arrival. A view enters once, in the character of its mood: joy from below, sadness
+   from above, tension from the side along the grid, warmth from a little smaller.
+   A calm title comes into focus, a tense one is uncovered by a hard wipe. Scripts add
+   .entering for the length of the entrance; without it everything is simply in place.
+   Nothing here waits for a scroll. */
+@keyframes arrive{from{opacity:0;transform:translate(var(--slide),var(--rise)) scale(var(--grow))}}
+@keyframes arrive-title{
+  from{opacity:var(--title-ghost);filter:blur(var(--soft));clip-path:inset(-20% var(--wipe) -20% -20%);transform:translate(var(--slide),var(--rise)) rotate(var(--tilt,0deg)) scale(var(--grow))}
+  to{clip-path:inset(-20%)}}
+/* The imprint spreads out from the centre of the wheel, the way a stamp takes to paper. */
+@keyframes imprint{from{opacity:0;transform:scale(.35)}}
+@keyframes fill{from{transform:scaleX(0)}}
+@keyframes appear{from{opacity:0}}
+.entering :is(.scene-text>time,.scene-text>p,.featured-text>.eyebrow,.featured-text>p,.featured-text>.feature-action,.transport,.catalog-links,.notes>section,.section-title,.pair,.day-card){
+  animation:arrive var(--settle) var(--spring) both;animation-delay:calc(var(--lead) + var(--i,0) * var(--step))}
+.entering :is(.scene-text>h1,.featured-text>h2){animation:arrive-title var(--settle) var(--spring) both;animation-delay:calc(var(--lead) + var(--step))}
+.entering .mood-stamp .shape{animation:imprint calc(var(--settle) * 1.2) var(--spring) both;animation-delay:calc(var(--lead) + 3 * var(--step))}
+.entering .meter i{animation:fill var(--settle) var(--spring) both;animation-delay:calc(var(--lead) + (var(--i,0) + 2) * var(--step))}
+/* Siblings follow one another; the total wait is capped. */
+.scene-text>p,.featured-text>p{--i:2}
+.featured-text>.feature-action,.transport{--i:3}
+.catalog-links,.notes>section:first-child{--i:4}
+.notes>section:last-child{--i:5}
+.section-title,.pair:nth-child(1),.day-card:nth-child(1){--i:1}
+.pair:nth-child(2),.day-card:nth-child(2){--i:2}
+.pair:nth-child(3),.day-card:nth-child(3){--i:3}
+.pair:nth-child(4),.day-card:nth-child(4){--i:4}
+.day-card:nth-child(5){--i:5}
+.day-card:nth-child(6){--i:6}
+.day-card:nth-child(n+7){--i:7}
+
+/* Opening a day: its card grows into the scene, and on the way back the scene returns
+   to its card. The move takes the settle time and the spring of the page that arrives;
+   the page it leaves goes faster than the new one comes. */
+.memory{view-transition-name:scene}
+::view-transition-group(scene){animation-duration:var(--settle);animation-timing-function:var(--spring)}
+::view-transition-old(scene),::view-transition-new(scene){height:100%;object-fit:cover;animation-duration:var(--quick);animation-timing-function:ease}
+::view-transition-old(root){animation-duration:calc(var(--quick) * .7)}
+::view-transition-new(root){animation-duration:var(--quick)}
+
+/* Reduced motion: nothing travels, loops rest. Colour and opacity still answer,
+   and a new view still appears rather than snapping in. */
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;scroll-behavior:auto!important;transition-property:color,background-color,border-color,opacity,text-decoration-color!important}
+  .frame,.thumb{--hover-zoom:1!important;--rise:0px!important;--slide:0px!important}
+  .entering :is(.scene-text>*,.featured-text>*,.transport,.catalog-links,.notes>section,.section-title,.pair,.day-card){animation:appear .2s ease both!important}
+  ::view-transition-group(*),::view-transition-old(*),::view-transition-new(*){animation:none!important}
+}
 
 .music-intro{margin:3px 0 9px;font-weight:650}
 #music-picks{display:grid;gap:5px}

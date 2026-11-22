@@ -26,7 +26,8 @@ page.on('pageerror', error => problems.push(String(error)));
 const settle = async () => {
   await page.evaluate(() => document.fonts.ready);
   await page.waitForFunction(() => [...document.querySelectorAll('img.frame')].every(image => image.complete && image.naturalWidth > 0));
-  await page.waitForTimeout(1300);
+  // A view enters in the character of its mood; the slowest days take over two seconds to settle.
+  await page.waitForTimeout(2900);
 };
 // A whole page is taken in a viewport as tall as the page, so the fixed background layers cover all of it.
 const whole = async name => {

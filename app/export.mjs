@@ -1,4 +1,4 @@
-import {foldDiary, siteTokens} from './feelings.mjs';
+import {foldDiary, motionLine, siteTokens} from './feelings.mjs';
 import {escape, rulesHTML, sceneHTML, stampSVG, themeStyle} from './scene.mjs';
 import {contextPageHTML} from './context.mjs';
 
@@ -58,6 +58,10 @@ async function asset(url) {
 }
 
 function offlineScene() {
+  // The page enters once in the character of the day, as it does in the diary.
+  const page=document.querySelector('main');
+  page.classList.add('entering');
+  setTimeout(()=>page.classList.remove('entering'),3200);
   const scene=document.querySelector('.memory');
   const frames=[...scene.querySelectorAll('.frame')];
   const dots=[...scene.querySelectorAll('.dot')];
@@ -166,7 +170,7 @@ function documentHTML(day, names, soundtrack, narration) {
 ${sceneHTML(day,names,formatDate(day.date))}
 <div class="transport"><button id="play" class="primary" type="button" aria-pressed="false">Воспроизвести</button>${names.length>1?'<button id="next" class="plain bordered">Следующий кадр</button>':''}<div class="track"><strong>${escape(music.track)}</strong>${rightsLabel}</div>${media}</div>
 ${streamingDetails}
-<section class="notes"><div><h2>Запись дня</h2><p class="story">${escape(day.story)}</p>${voicePlayer}</div><div class="reading"><h2>Как собрана сцена</h2><div class="mood-stamp">${stampSVG(imprint.feelings,{labels:true,title:'Оттиск дня: '+imprint.moodName})}</div>${rulesHTML(imprint)}<p class="hint">${imprint.duration.toFixed(1)} с на кадр по темпу музыки.</p></div></section>
+<section class="notes"><div><h2>Запись дня</h2><p class="story">${escape(day.story)}</p>${voicePlayer}</div><div class="reading"><h2>Как собрана сцена</h2><div class="mood-stamp">${stampSVG(imprint.feelings,{labels:true,title:'Оттиск дня: '+imprint.moodName})}</div>${rulesHTML(imprint)}<p class="hint">${imprint.duration.toFixed(1)} с на кадр по темпу музыки. ${escape(motionLine(imprint.feelings))}</p></div></section>
 ${catalogCredit(music)}
 ${contextPageHTML(imprint.context, imprint)}</main><script>(${offlineScene.toString()})();</script></body></html>`;
 }

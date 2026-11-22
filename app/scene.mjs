@@ -1,6 +1,6 @@
 // Markup for a memory, built only from strings so the page and the exported
 // folder draw a day in exactly the same way.
-import {FEELINGS, IDS, PAIRS, clamp, feelingName, opposite} from './feelings.mjs';
+import {FEELINGS, IDS, PAIRS, clamp, feelingName, motionTokens, opposite} from './feelings.mjs';
 import {contextRules, contextSVG} from './context.mjs';
 
 export const escape = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -10,9 +10,28 @@ const colour = (id, light = 62) => {
   return `hsl(${feeling.hue} ${Math.max(feeling.sat, 38)}% ${light}%)`;
 };
 
+// How things move, as custom properties. A scene carries its own day's motion, the
+// site carries the diary's (or the open day's); both come from motionTokens.
+// A browser without linear() easing gets the nearest ordinary curve.
+const SPRINGS = typeof CSS === 'undefined' || !CSS.supports || CSS.supports('animation-timing-function', 'linear(0, 1)');
+export function motionVars(motion) {
+  const m = motion;
+  const spring = SPRINGS ? m.easing
+    : m.bounce >= .02 ? 'cubic-bezier(.3,1.45,.5,1)' : m.ratio >= 1.15 ? 'cubic-bezier(.16,1,.3,1)' : 'cubic-bezier(.2,.8,.2,1)';
+  return {
+    '--spring': spring, '--settle': `${m.settle}s`, '--quick': `${m.quick}s`, '--step': `${m.step}s`,
+    '--rise': `${m.rise}px`, '--slide': `${-m.slide}px`, '--grow': String(m.grow), '--soft': `${m.soft}px`,
+    '--wipe': m.wipe ? '104%' : '-20%', '--title-ghost': m.wipe ? '1' : '0',
+    '--hover-zoom': String(m.hoverZoom), '--hover-time': `${m.hoverTime}s`, '--press': `${m.pressDepth}px`,
+    '--cam-back': String(m.camBack), '--cam-y': `${m.camY}%`, '--cam-pad': String(m.camPad), '--cam-ease': m.camEase,
+    '--ambient': `${m.ambient}s`, '--swell': String(m.swell)
+  };
+}
+
 export function sceneStyle(imprint) {
   const i = imprint;
   return [
+    ...Object.entries(motionVars(motionTokens(i.feelings))).map(([name, value]) => `${name}:${value}`),
     ...IDS.map(id => `--${id}:${i.feelings[id]}`),
     `--hue:${i.hue}`, `--sat:${i.saturation}%`, `--base:${i.dark}%`, `--wash:${i.wash}`, `--grain:${i.grain}`,
     `--contrast:${i.contrast}`, `--filter-sat:${i.filterSat}`, `--sepia:${i.sepia}`, `--bright:${i.bright}`, `--matte:${i.matte ?? 0}`,
@@ -33,8 +52,8 @@ export function themeVars(tokens) {
     '--well': `hsl(${hue} ${sat}% ${Math.max(4, light(-2.5))}%)`,
     '--raise': `hsl(${hue} ${sat + 4}% ${light(8)}%)`,
     // A translucent light line reads as structure on any tinted paper.
-    '--edge': `hsl(${hue} ${Math.min(40, sat + 10)}% 86% / .16)`,
-    '--text': `hsl(${hue} 22% 93%)`,
+    '--edge': `hsl(${hue} ${Math.min(40, sat + 10)}% 86% / ${tokens.edge ?? .16})`,
+    '--text': `hsl(${hue} 22% ${tokens.textLight ?? 93}%)`,
     '--muted': `hsl(${hue} 10% 72%)`,
     '--accent': `hsl(${tokens.accentHue} ${tokens.accentSat}% ${tokens.accentLight}%)`,
     '--accent-hi': `hsl(${tokens.accentHue} ${tokens.accentSat}% ${tokens.accentLight + 7}%)`,
@@ -47,7 +66,14 @@ export function themeVars(tokens) {
     // Section headings are smaller than a scene title, so they are tightened less.
     '--display-track': `${Math.round(tokens.tracking * 70) / 100}em`,
     '--display-scale': String(Math.round((1 + (tokens.titleScale - 1) * .5) * 100) / 100),
-    '--tempo': `${tokens.tempo}s`
+    '--tempo': `${tokens.tempo}s`,
+    '--air': String(tokens.air ?? 1),
+    '--glow-x': `${tokens.glowX ?? 85}%`,
+    '--glow-y': `${tokens.glowY ?? -10}%`,
+    '--vignette': String(tokens.vignette ?? 0),
+    '--leading': String(tokens.leading ?? 1.7),
+    '--measure': `${tokens.measure ?? 62}ch`,
+    ...(tokens.motion ? motionVars(tokens.motion) : {})
   };
 }
 export const themeStyle = tokens => Object.entries(themeVars(tokens)).map(([name, value]) => `${name}:${value}`).join(';');

@@ -6,7 +6,7 @@ import {setupMusicPicker} from './music-picker.mjs';
 import {setupImagePicker} from './image-picker.mjs';
 import {setupVoiceEntry} from './voice-entry.mjs';
 import {downloadArchive, downloadDay} from './export.mjs';
-import {IDS, emptyFeelings, feelingLabel, feelingName, foldDiary, siteTokens} from './feelings.mjs';
+import {IDS, emptyFeelings, feelingLabel, feelingName, foldDiary, motionLine, siteTokens} from './feelings.mjs';
 import {contextPageHTML, contextSVG} from './context.mjs';
 import {escape, layersHTML, motifSVG, number, pairsHTML, rulesHTML, sceneHTML, sceneStyle, stampSVG, themeVars, treatment, tuneHTML} from './scene.mjs';
 import {readStory, readingStatus} from './reading.mjs';
@@ -200,7 +200,8 @@ function renderDay(day, photo, fileURL) {
         ${tuneHTML(day.reading.feelings)}
         <button class="plain bordered" id="reread" type="button" hidden>Прочитать запись через OpenAI</button>
         <dl><div><dt>Кадры</dt><dd id="frames-line"></dd></div>
-        <div><dt>Музыка</dt><dd id="music-line"></dd></div></dl>
+        <div><dt>Музыка</dt><dd id="music-line"></dd></div>
+        <div><dt>Движение</dt><dd id="motion-line"></dd></div></dl>
         <p class="hint">${day.demo?'Это пример: правки чисел действуют до перезагрузки страницы. ':''}Числа описывают текст записи, а не состояние автора.</p>
       </section></div>
     </article>${contextPageHTML(day.imprint.context,day.imprint)}`;
@@ -227,6 +228,7 @@ function renderDay(day, photo, fileURL) {
     main.querySelector('#day-rules').innerHTML=rulesHTML(imprint);
     main.querySelector('#frames-line').innerHTML=framesLine(day);
     main.querySelector('#music-line').textContent=musicLine(day);
+    main.querySelector('#motion-line').textContent=motionLine(imprint.feelings);
     reread.hidden=!model.available || day.reading.source==='ai';
   }
   function restyle() {
@@ -367,7 +369,51 @@ function renderDay(day, photo, fileURL) {
   };
 }
 
-function render(navigate=false) {
+// A view enters once, moving in the character of its mood (see the Arrival rules in
+// style.css). The class is taken off afterwards, so redrawing a part of the page
+// later, a slider or a search, does not replay the entrance.
+const stillness = matchMedia('(prefers-reduced-motion: reduce)');
+let entering;
+function enter(lead=0) {
+  clearTimeout(entering);
+  main.classList.remove('entering');
+  void main.offsetWidth;
+  main.style.setProperty('--lead',lead+'s');
+  main.classList.add('entering');
+  entering=setTimeout(()=>main.classList.remove('entering'),3200);
+}
+
+// Moving between the archive and a day keeps hold of the photograph: the card that
+// was opened grows into the scene, and the scene goes back to its card. Where the
+// browser cannot do this, or the visitor asked for less motion, the view just changes.
+let opened=null;
+main.addEventListener('click',event=>{opened=event.target.closest?.('a.featured, a.day-card')||null;});
+const linksTo = id => [...main.querySelectorAll('a.featured, a.day-card')].filter(link=>link.getAttribute('href')===href(id));
+const onScreen = element => {
+  const box=element.getBoundingClientRect();
+  return box.bottom>0 && box.top<innerHeight;
+};
+function hold(link) {
+  const picture=link?.classList.contains('featured') ? link : link?.querySelector('.thumb');
+  if (picture) picture.style.viewTransitionName='scene';
+  return picture;
+}
+function travel() {
+  const leaving=main.querySelector('.memory') ? shownDay : null;
+  const target=days.find(record=>href(record.id)===location.hash);
+  if (!document.startViewTransition || stillness.matches || (!target && !leaving)) { render(true); return; }
+  if (target && !leaving) hold(opened && main.contains(opened) && opened.getAttribute('href')===href(target.id) ? opened : linksTo(target.id).find(onScreen));
+  let held;
+  const transition=document.startViewTransition(()=>{
+    render(true,.14);
+    if (leaving && !target) held=hold(linksTo(leaving).find(onScreen));
+  });
+  transition.ready.catch(()=>{});
+  transition.finished.catch(()=>{}).then(()=>held?.style.removeProperty('view-transition-name'));
+}
+
+let shownDay=null;
+function render(navigate=false,lead=0) {
   renderCleanup();
   const urls = new Map();
   function fileURL(file) {
@@ -383,6 +429,10 @@ function render(navigate=false) {
   document.title=day?`${day.imprint.title} — Оттиск`:'Оттиск — личный дневник';
   // On a day's page the one accented action is playing the memory, not writing a new one.
   root.dataset.view=day?'day':'archive';
+  // The entrance plays when a view is opened, not when the open view is redrawn.
+  if (shownDay!==(day?.id??null) || !main.dataset.shown) enter(lead);
+  shownDay=day?.id??null;
+  main.dataset.shown='1';
   renderCleanup=()=>{cleanup?.();for(const url of urls.values()) URL.revokeObjectURL(url);};
   if (location.hash==='#archive') {
     main.querySelector('#archive')?.scrollIntoView();
@@ -576,5 +626,5 @@ if (model.hosted) document.querySelector('footer span:last-child').textContent='
 else if (!model.server) document.querySelector('footer span:last-child').textContent='Версия без сервера: запись читает собственная модель «Оттиска» на устройстве, генерация картинок и новая озвучка недоступны. Записи хранятся в этом браузере';
 render();
 if (results.some(result=>result.status==='rejected') || (stored.status==='fulfilled' && stored.value.failed)) announce('Не удалось загрузить часть дневника.');
-window.addEventListener('hashchange',()=>render(true));
+window.addEventListener('hashchange',travel);
 musicMode();
