@@ -7,7 +7,7 @@
 // the signs keep their shape on a wide scene, a phone and a card alike.
 
 // Same tiny generator as scene.mjs (copied: that one is private to the scene).
-function seeded(text) {
+export function seeded(text) {
   let hash = 2166136261;
   for (const ch of String(text)) hash = Math.imul(hash ^ ch.codePointAt(0), 16777619);
   let state = hash >>> 0;
@@ -52,8 +52,8 @@ const STYLE = `<style>
 </style>`;
 
 // The colours of a holiday, leaned toward the accent of the day so the signs belong to its scene.
-const mix = (colour, share = 70) => `color-mix(in oklab,${colour} ${share}%,var(--scene-accent,#fff))`;
-const PALETTE = {
+export const mix = (colour, share = 70) => `color-mix(in oklab,${colour} ${share}%,var(--scene-accent,#fff))`;
+export const PALETTE = {
   halloween: ['hsl(28 92% 62%)', 'hsl(268 40% 84%)'],
   newyear: ['hsl(152 42% 64%)', 'hsl(46 95% 72%)'],
   birthday: ['hsl(338 85% 74%)', 'hsl(46 95% 70%)'],
@@ -63,7 +63,7 @@ const PALETTE = {
 
 // ---------------------------------------------------------------------------
 // Glyphs, each in a box from -50 to 50.
-const flake = (r, cls = 'd-lp', w = 1.5) => [0, 60, 120].map(angle =>
+export const flake = (r, cls = 'd-lp', w = 1.5) => [0, 60, 120].map(angle =>
   `<g transform="rotate(${angle})"><line class="${cls}" x1="0" y1="${-r}" x2="0" y2="${r}" stroke-width="${w}"/>` +
   `<path class="${cls}" stroke-width="${w}" d="M${f1(-r * .28)} ${f1(-r * .82)}L0 ${f1(-r * .55)}L${f1(r * .28)} ${f1(-r * .82)}M${f1(-r * .28)} ${f1(r * .82)}L0 ${f1(r * .55)}L${f1(r * .28)} ${f1(r * .82)}"/></g>`).join('');
 const CLOUD = 'M-30 12A11 11 0 0 1-26-8A15 15 0 0 1 2-18A13 13 0 0 1 24-6A10 10 0 0 1 32 12Z';
@@ -77,7 +77,7 @@ const rays = (inner, outer, count, wavy) => Array.from({length: count}, (_, i) =
   return `<path class="d-la" d="M${f1(c * inner)} ${f1(s * inner)}Q${f1(c * m - s * n)} ${f1(s * m + c * n)} ${f1(c * o)} ${f1(s * o)}"/>`;
 }).join('');
 
-const GLYPHS = {
+export const GLYPHS = {
   // Halloween
   pumpkin: () => `<g class="d-bob"><path class="d-fa" d="M0-14C-30-18-38 4-30 18C-24 30-10 30 0 26C10 30 24 30 30 18C38 4 30-18 0-14Z"/>
     <path class="d-la" d="M0-14C-30-18-38 4-30 18C-24 30-10 30 0 26C10 30 24 30 30 18C38 4 30-18 0-14Z"/>
@@ -207,7 +207,7 @@ const SLOTS = {
   grid: {sky: [90, 22, 14], spots: [[92, 45], [90, 66], [58, 80], [72, 74], [44, 84], [84, 84]], size: 12.5},
   card: {sky: [80, 26, 30], spots: [[50, 22], [88, 66], [28, 18], [64, 52]], size: 21}
 };
-const KITS = {
+export const KITS = {
   halloween: ['pumpkin', 'ghost', 'bat', 'skull', 'bat', 'spider', 'pumpkin'],
   newyear: ['fir', 'snowflake', 'bauble', 'star', 'sparkler', 'snowflake', 'fir'],
   birthday: ['balloon', 'candle', 'balloon', 'confetti', 'balloon', 'candle', 'confetti'],
@@ -324,21 +324,4 @@ export function signsSVG(context, imprint, seed, size = 1) {
   const [a, b] = PALETTE[occasion || 'none'];
   const style = `--d-a:${mix(a)};--d-b:${mix(b)};--d-p:color-mix(in oklab,hsl(var(--hue,40) 40% 93%) 85%,var(--scene-accent,#fff));--d-w:${mix('hsl(205 75% 82%)', 78)}`;
   return `<svg class="decor d-ctx" style="${style}" width="100%" height="100%" aria-hidden="true" focusable="false">${STYLE}${parts.join('')}</svg>`;
-}
-
-// Falling snow at the sides of an open day's page, never under the words.
-export function pageSnow(amount, quiet) {
-  const random = seeded('page-snow');
-  const flakes = Array.from({length: Math.round(8 + amount * 10)}, (_, i) => {
-    const left = i % 2 ? 1 + random() * 9 : 90 + random() * 9;
-    const size = 6 + random() * 8, time = 16 + random() * 14 + quiet * 10;
-    return `<svg class="d-pf" style="left:${f1(left)}vw;width:${f1(size)}px;height:${f1(size)}px;animation-duration:${f1(time)}s;animation-delay:-${f1(random() * time)}s" viewBox="-10 -10 20 20">${flake(9, 'd-lp', 1.6)}</svg>`;
-  }).join('');
-  return `<div class="d-page" aria-hidden="true"><style>
-.d-page{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden;opacity:.45}
-.d-page .d-lp{fill:none;stroke:var(--accent-hi,#fff);stroke-linecap:round}
-.d-page .d-pf{position:absolute;top:-20px;animation:d-pagefall linear infinite}
-@keyframes d-pagefall{to{transform:translateY(105vh) rotate(160deg)}}
-@media(prefers-reduced-motion:reduce){.d-page{display:none}}
-</style>${flakes}</div>`;
 }

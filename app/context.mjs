@@ -7,7 +7,8 @@
 // «Как собрана сцена», main.mjs adds contextSVG() to the cards of the archive and
 // contextPageHTML() to the page of an open day. Everything returned is a plain
 // string that carries its own styles, so the exported folder shows it as well.
-import {pageSnow, signsSVG} from './context-signs.mjs';
+import {signsSVG} from './context-signs.mjs';
+import {pageDecor} from './context-page.mjs';
 
 // Word edges by hand: \b does not know Cyrillic or Kazakh letters.
 const A = '(?<![\\p{L}\\d])';
@@ -160,9 +161,9 @@ export function contextSVG(context, imprint, seed, size = 1) {
 }
 
 const OCCASION = {
-  halloween: ['Хэллоуин', 'тыквы, призраки, летучие мыши и паутина по краям кадра'],
-  newyear: ['Новый год', 'ёлки, снежинки, шары и гирлянда по верху кадра'],
-  birthday: ['День рождения', 'воздушные шары, свечи, флажки и конфетти'],
+  halloween: ['Хэллоуин', 'тыквы, призраки, летучие мыши и паутина по краям кадра и по всей странице'],
+  newyear: ['Новый год', 'ёлки, снежинки, шары и гирлянда по верху кадра и страницы'],
+  birthday: ['День рождения', 'воздушные шары, свечи, флажки и конфетти в кадре и на полях страницы'],
   nauryz: ['Наурыз', 'тюльпаны, подснежники, шаңырақ, орнамент «қошқар мүйіз» и алтыбақан']
 };
 // [light, plain, strong] wording of each sign.
@@ -191,10 +192,8 @@ export function contextRules(context) {
   return rules;
 }
 
-// An optional layer over the whole page of an open day (falling snow, for example): '' or markup.
+// The day's signs over the whole page of an open day: '' when the entry names neither a holiday nor weather.
 export function contextPageHTML(context, imprint) {
-  if (!context) return '';
-  const snow = context.weather?.find(item => item.kind === 'snow');
-  if (!snow && context.occasion !== 'newyear') return '';
-  return pageSnow(snow ? snow.amount : .4, imprint?.feelings?.quiet ?? .3);
+  if (!context || (!context.occasion && !context.weather?.length)) return '';
+  return pageDecor(context, imprint || {});
 }
