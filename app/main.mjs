@@ -32,7 +32,7 @@ let renderCleanup = () => {};
 let noticeTimer;
 let busy = false;
 let step = 1;
-let model = {available:false, model:''};
+let model = {available:false, model:'', server:true};
 
 const announce = message => {
   clearTimeout(noticeTimer);
@@ -448,7 +448,8 @@ function paintReadingChoice() {
   document.querySelector('#ai-consent').hidden=!model.available;
   document.querySelector('#reading-hint').textContent=model.available
     ? 'С галочкой при сборке воспоминания текст записи отправится в OpenAI: модель оценит настроение дня и назовёт папку. Без галочки текст останется на устройстве, а настроение оценит встроенный словарь.'
-    : 'Настроение дня оценит встроенный словарь на устройстве. Чтобы запись читала модель, подключите ключ OpenAI по инструкции проекта и перезапустите дневник.';
+    : model.server ? 'Настроение дня оценит встроенный словарь на устройстве. Чтобы запись читала модель, подключите ключ OpenAI по инструкции проекта и перезапустите дневник.'
+    : 'Настроение дня оценит встроенный словарь на устройстве: эта версия открыта без сервера, и текст никуда не отправляется.';
 }
 // Show what is already known at once, then check again in case the key changed.
 async function showReadingChoice() {
@@ -560,6 +561,8 @@ if (results[2].status==='fulfilled') {
 }
 sortDays();
 if (results[3].status==='fulfilled') model=results[3].value;
+// A copy opened without the local server still keeps a diary, but says plainly what it cannot do.
+if (!model.server) document.querySelector('footer span:last-child').textContent='Версия без сервера: настроение оценивает словарь, генерация картинок и новая озвучка недоступны. Записи хранятся в этом браузере';
 render();
 if (results.some(result=>result.status==='rejected') || (stored.status==='fulfilled' && stored.value.failed)) announce('Не удалось загрузить часть дневника.');
 window.addEventListener('hashchange',()=>render(true));

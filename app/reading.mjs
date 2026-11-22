@@ -7,10 +7,10 @@ export async function readingStatus() {
     const response = await fetch('/api/reading/status', {cache: 'no-store', signal: AbortSignal.timeout(4000)});
     if (response.ok) {
       const info = await response.json();
-      return {available: Boolean(info.available), model: String(info.model ?? '')};
+      return {available: Boolean(info.available), model: String(info.model ?? ''), server: true};
     }
   } catch { /* A static copy of the diary has no server. */ }
-  return {available: false, model: ''};
+  return {available: false, model: '', server: false};
 }
 
 export async function readStory(story, useModel) {
