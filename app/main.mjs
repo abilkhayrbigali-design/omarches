@@ -148,7 +148,7 @@ function shifts(from, to) {
 function framesLine(day) {
   const {imprint}=day;
   const moved=shifts(imprint.text,imprint.pictured);
-  return `${day.frameOrigins?.some(frame=>frame.type==='generated')?'В сцене есть иллюстрация, созданная по рассказу. ':''}<span class="swatch" style="--sample:${imprint.photoHue} ${imprint.photoSat}% ${Math.max(28,Math.round(imprint.light))}%"></span> Оттенок кадра смешан с цветом ведущего чувства, светлота ${Math.round(imprint.light)}%. `
+  return `${day.frameOrigins?.some(frame=>frame.type==='generated')?'В сцене есть иллюстрация, созданная по рассказу. ':''}<span class="swatch" style="--sample:${imprint.photoHue} ${imprint.photoSat}% ${Math.max(28,Math.round(imprint.light))}%"></span> Оттенок кадра подмешан к цвету сцены, тем слабее, чем он дальше от цвета чувства и чем больше в дне грусти и уединения. Светлота ${Math.round(imprint.light)}%. `
     + (moved.length ? `Теплота цвета, плотность и свет кадров сдвинули числа: ${moved.join(', ')}.` : 'Числа кадры не сдвинули.');
 }
 
