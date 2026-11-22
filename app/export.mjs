@@ -1,5 +1,6 @@
 import {foldDiary, siteTokens} from './feelings.mjs';
 import {escape, rulesHTML, sceneHTML, stampSVG, themeStyle} from './scene.mjs';
+import {contextPageHTML} from './context.mjs';
 
 const encoder = new TextEncoder();
 const dateFormat = new Intl.DateTimeFormat('ru-RU',{day:'numeric', month:'long', year:'numeric', timeZone:'UTC'});
@@ -167,7 +168,7 @@ ${sceneHTML(day,names,formatDate(day.date))}
 ${streamingDetails}
 <section class="notes"><div><h2>Запись дня</h2><p class="story">${escape(day.story)}</p>${voicePlayer}</div><div class="reading"><h2>Как собрана сцена</h2><div class="mood-stamp">${stampSVG(imprint.feelings,{labels:true,title:'Оттиск дня: '+imprint.moodName})}</div>${rulesHTML(imprint)}<p class="hint">${imprint.duration.toFixed(1)} с на кадр по темпу музыки.</p></div></section>
 ${catalogCredit(music)}
-</main><script>(${offlineScene.toString()})();</script></body></html>`;
+${contextPageHTML(imprint.context, imprint)}</main><script>(${offlineScene.toString()})();</script></body></html>`;
 }
 
 async function dayEntries(day, folder) {
