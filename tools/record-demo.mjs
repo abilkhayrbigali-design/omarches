@@ -216,7 +216,10 @@ await pause(4.2);
 say('Сцена собрана из текста, фото и песни. Темп музыки задаёт ритм кадров');
 await click('#play');
 await page.mouse.move(WIDTH * .78, HEIGHT * .3, {steps: 20});
-await pause(12.5);
+await pause(6.2);
+// A holiday or the weather named in the entry is drawn on the scene: point it out when it is there.
+if (await page.locator('.memory .decor').count()) say('В записи назван праздник или погода, и на сцене появились их знаки');
+await pause(6.3);
 await click('#play');
 say('Оттиск и правила объясняют, почему день выглядит именно так');
 await glide('#day-stamp');

@@ -131,7 +131,7 @@ export function localFeelings(story) {
 // ---------------------------------------------------------------------------
 // A folder name without a language model: the most concrete short clause.
 const LEAD_DROP = new Set(('сегодня вчера потом затем утром вечером днем ночью мы я и а но было была был были это так еще уже ' +
-  'когда пока после наконец просто очень все всё тут там вот тогда сначала зато однако').split(' '));
+  'когда пока наконец просто очень все всё тут там вот тогда сначала зато однако').split(' '));
 const TAIL_DROP = new Set(('в во на с со к ко по за из от до у о об под над при для без через и а но или что как где когда чтобы ' +
   'мы я он она они ее её его их мне меня нам нас не ни же бы ли то это этот эта очень так уже еще ещё только пока сих пор').split(' '));
 const VERB = /(?:л|ла|ли|ло|лся|лась|лись|лось|ть|ться|тся|ешь|ете|ют|ут|ит|ят)$/;
@@ -139,7 +139,8 @@ const VERB = /(?:л|ла|ли|ло|лся|лась|лись|лось|ть|тьс
 function trimTitle(list) {
   const result = [...list];
   while (result.length && LEAD_DROP.has(result[0].toLowerCase())) result.shift();
-  if (result.length > 6) result.length = 6;
+  // Up to seven words, so a two-word name at the end («Mega Silkway») is not cut in half.
+  if (result.length > 7) result.length = 7;
   while (result.length && TAIL_DROP.has(result.at(-1).toLowerCase())) result.pop();
   return result;
 }
