@@ -41,7 +41,7 @@ or «Ужин у бабушки на даче». Use the details of this entry, 
 No first-person verbs, no quotation marks, no full stop, no emoji. Capitalise only
 the first word and proper names.
 
-reason: one sentence in Russian, at most 160 characters, naming the details of the
+reason: one sentence in the requested interface language, at most 160 characters, naming the details of the
 entry that decided the reading. Describe the text, not the person: no diagnosis, no advice."""
 
 SCHEMA = {
@@ -77,10 +77,13 @@ def default_model():
     return _working_model or MODELS[0]
 
 
-def _ask(model, story, key):
+def _ask(model, story, key, reason_language):
+    language = {"ru": "Russian", "kk": "Kazakh", "en": "English"}.get(
+        reason_language if isinstance(reason_language, str) else "", "Russian"
+    )
     payload = {
         "model": model,
-        "input": [{"role": "system", "content": PROMPT}, {"role": "user", "content": story}],
+        "input": [{"role": "system", "content": PROMPT + "\nInterface language for reason: " + language + "."}, {"role": "user", "content": story}],
         "text": {"format": {"type": "json_schema", "name": "day_reading", "strict": True, "schema": SCHEMA}},
         "max_output_tokens": 2000,
         # A diary entry is private: do not keep it on the provider's side.
@@ -114,14 +117,14 @@ def _clean(result, model):
     return {"feelings": feelings, "title": title, "reason": reason[:240], "model": model, "source": "ai"}
 
 
-def read_story(story, key):
+def read_story(story, key, reason_language="ru"):
     """Return {'feelings', 'title', 'reason', 'model', 'source'} for one entry."""
     global _working_model
     candidates = [_working_model] if _working_model else MODELS
     last = None
     for model in candidates:
         try:
-            reading = _clean(_ask(model, story, key), model)
+            reading = _clean(_ask(model, story, key, reason_language), model)
             _working_model = model
             return reading
         except error.HTTPError as exc:

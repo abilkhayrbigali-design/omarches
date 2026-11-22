@@ -158,7 +158,7 @@ def render_reading(data):
     if not key:
         raise ApiError(503, "key_missing", "Ключ OpenAI не подключён. Настроение оценит словарь на устройстве.")
     try:
-        return read_story(story.strip(), key)
+        return read_story(story.strip(), key, data.get("reasonLanguage", "ru"))
     except ReadingError as exc:
         raise ApiError(exc.status, exc.code, str(exc)) from exc
 

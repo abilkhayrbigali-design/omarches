@@ -12,7 +12,7 @@
 <body>
   <header class="top">
     <a class="brand" href="#" aria-label="Оттиск, архив"><span class="mark" id="brand-mark" aria-hidden="true"></span> Оттиск<span class="brand-note">Личный дневник</span></a>
-    <nav aria-label="Разделы"><a class="nav-link" href="#archive">Архив</a><button class="primary" id="compose">Записать день</button></nav>
+    <nav aria-label="Разделы"><a class="nav-link" href="#archive">Архив</a><label class="sr-only" for="language">Язык интерфейса</label><select id="language"><option value="ru" lang="ru" translate="no">Русский</option><option value="kk" lang="kk">Қазақша</option><option value="en" lang="en">English</option></select><button class="primary" id="compose">Записать день</button></nav>
   </header>
   <main id="main" tabindex="-1"></main>
   <dialog id="editor" aria-labelledby="editor-title">
@@ -21,8 +21,11 @@
       <section data-step="1">
       <label>Дата <input name="date" type="date" required></label>
       <label>Текст дня <textarea name="story" placeholder="Где вы были? Какими были свет, звуки и люди рядом?" required maxlength="6000" rows="4"></textarea></label>
+      <label>Язык диктовки <select name="dictationLanguage"><option value="ru">Русский</option><option value="kk">Казахский</option><option value="en">Английский</option></select></label>
       <button type="button" id="dictate-story" class="plain bordered">Надиктовать день</button>
       <p id="dictation-status" class="hint" role="status"></p>
+      <label class="check" id="server-consent" hidden><input type="checkbox" name="useServer" aria-describedby="server-hint"> Прочитать усиленной моделью «Оттиска»</label>
+      <p id="server-hint" class="hint" hidden>Текст отправится на сервер «Оттиска» для анализа.</p>
       <label class="check" id="ai-consent" hidden><input type="checkbox" name="useAI"> Прочитать запись моделью OpenAI вместо своей</label>
       <p class="hint" id="reading-hint"></p>
       </section>

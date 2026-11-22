@@ -1,3 +1,4 @@
+import {t} from './i18n.mjs';
 import {searchMusic} from './online-catalog.mjs';
 import {musicQuery, rankOnlineTracks} from './music-query.mjs';
 import {recommendTracks} from './recommend.mjs';
@@ -31,8 +32,8 @@ function externalLink(text, url) {
 
 function catalogMusic(track) {
   const description = track.licenseCode === 'cc0'
-    ? 'Источник указывает посвящение CC0. Ссылка на оригинал приложена к записи.'
-    : 'При публикации укажите название, автора, источник, ссылку на лицензию и внесённые изменения.';
+    ? t('Источник указывает посвящение CC0. Ссылка на оригинал приложена к записи.')
+    : t('При публикации укажите название, автора, источник, ссылку на лицензию и внесённые изменения.');
   const tags = [...track.genres, ...track.tags, track.title].join(' ').toLowerCase();
   const vibrant = /upbeat|energetic|dance|techno|drum|driving|punk|metal|intense/.test(tags);
   const quiet = /ambient|soft|piano|meditat|relax|mellow|slow|peaceful|calm/.test(tags);
@@ -89,7 +90,7 @@ export function setupMusicPicker(form) {
     version = 0;
     generatedPreview.removeAttribute('src');
     generatedPreview.hidden = true;
-    generate.textContent = 'Сочинить мелодию';
+    generate.textContent = t('Сочинить мелодию');
     generatedStatus.textContent = '';
   }
   function choose(track) {
@@ -99,13 +100,13 @@ export function setupMusicPicker(form) {
     player.hidden = false;
     get('preview-title').textContent = track.title+' · '+track.artist;
     get('catalog-credit').replaceChildren(
-      externalLink('Страница трека',track.sourceUrl), ' · ', externalLink(track.license,track.licenseUrl),
-      track.licenseCode === 'by' ? ' · При публикации укажите автора.' : ' · Доступен по CC0.'
+      externalLink(t('Страница трека'),track.sourceUrl), ' · ', externalLink(track.license,track.licenseUrl),
+      track.licenseCode === 'by' ? t(' · При публикации укажите автора.') : t(' · Доступен по CC0.')
     );
   }
   preview.addEventListener('error', () => {
     if (mode === 'assist' && selected && preview.currentSrc === selected.audioUrl)
-      status.textContent = 'Источник не воспроизвёл трек. Откройте его страницу или выберите другой.';
+      status.textContent = t('Источник не воспроизвёл трек. Откройте его страницу или выберите другой.');
   });
   function addTrack(track) {
     const label = document.createElement('label');
@@ -132,7 +133,7 @@ export function setupMusicPicker(form) {
     const controller = new AbortController();
     request = controller;
     more.disabled = true;
-    status.textContent = 'Ищем музыку в Openverse…';
+    status.textContent = t('Ищем музыку в Openverse…');
     const previousCount = records.size;
     try {
       // Empty or duplicated result pages can occur after licensing filters.
@@ -145,15 +146,15 @@ export function setupMusicPicker(form) {
         if (result.hasMore) page++;
         else { term++; page=1; }
       }
-      status.textContent = records.size ? 'Треков в подборке: '+records.size
-        : 'Подходящих записей по этой теме пока нет.';
-      more.textContent = 'Ещё треки';
+      status.textContent = records.size ? t('Треков в подборке: ')+records.size
+        : t('Подходящих записей по этой теме пока нет.');
+      more.textContent = t('Ещё треки');
       more.hidden = term >= terms.length;
     } catch (error) {
       if (controller.signal.aborted) return;
       status.textContent = error.message;
       more.hidden = false;
-      more.textContent = 'Повторить поиск';
+      more.textContent = t('Повторить поиск');
     } finally {
       if (request === controller) { request=null; more.disabled=false; }
     }
@@ -185,7 +186,7 @@ export function setupMusicPicker(form) {
         get('query-reason').textContent=query.reason;
       }
       if (!records.size) loadMore();
-      else status.textContent='Треков в подборке: '+records.size;
+      else status.textContent=t('Треков в подборке: ')+records.size;
     }
   }
 
@@ -193,7 +194,7 @@ export function setupMusicPicker(form) {
     if (!story || mode !== 'generate') return;
     const current = ++generation;
     generate.disabled=true;
-    generatedStatus.textContent='Сочиняем мелодию…';
+    generatedStatus.textContent=t('Сочиняем мелодию…');
     try {
       const styleId = recommendTracks(story)[0].id;
       const song = await generateMusic({story,styleId,variant:version+1});
@@ -205,10 +206,11 @@ export function setupMusicPicker(form) {
       generatedURL=URL.createObjectURL(song.blob);
       generatedPreview.src=generatedURL;
       generatedPreview.hidden=false;
-      generatedStatus.textContent=song.track+' · '+song.analysis.bpm+' уд/мин';
-      generate.textContent='Сочинить другой вариант';
+      const [name, variation] = song.track.split(' · ');
+      generatedStatus.textContent=[t(name), variation, song.analysis.bpm+t(' уд/мин')].join(' · ');
+      generate.textContent=t('Сочинить другой вариант');
     } catch {
-      if (generation===current) generatedStatus.textContent='Синтез не удался. Попробуйте ещё раз.';
+      if (generation===current) generatedStatus.textContent=t('Синтез не удался. Попробуйте ещё раз.');
     } finally {
       if (generation===current) generate.disabled=false;
     }
@@ -219,14 +221,14 @@ export function setupMusicPicker(form) {
     pause() { cancel(); mode=''; },
     async selectedMusic() {
       if (mode==='generate') {
-        if (!generated || generate.disabled) throw Error('Сначала сочините мелодию и дождитесь её готовности.');
+        if (!generated || generate.disabled) throw Error(t('Сначала сочините мелодию и дождитесь её готовности.'));
         return generated;
       }
-      if (!selected) throw Error('Сначала выберите трек, добавьте файл или укажите ссылку.');
+      if (!selected) throw Error(t('Сначала выберите трек, добавьте файл или укажите ссылку.'));
       const music = catalogMusic(selected);
-      status.textContent = 'Слушаем выбранный трек…';
+      status.textContent = t('Слушаем выбранный трек…');
       const heard = await listen(selected);
-      status.textContent = 'Треков в подборке: '+records.size;
+      status.textContent = t('Треков в подборке: ')+records.size;
       // Tempo, energy and mode measured from the sound replace the guess made from tags.
       return heard ? {...music, analysis: heard} : music;
     }

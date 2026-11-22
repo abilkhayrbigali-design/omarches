@@ -1,3 +1,5 @@
+import {normalizeContextText} from './context-spelling.mjs';
+import {t} from './i18n.mjs';
 // What an entry is about besides how it felt: a holiday, the weather.
 // The diary draws these as signs on the scene of the day.
 //
@@ -27,8 +29,8 @@ const IDIOMS = find([
 
 // A sign is not drawn when a negation or a wish stands just before it ("без снега",
 // "обещали дождь", "no rain") or a denial just after it ("дождя не было").
-const BEFORE = new RegExp(A + '(?:не|нет|без|ни|no|not|without|never|didn\'t|wasn\'t|isn\'t|жоқ|емес|обещал\\p{L}*|прогноз\\p{L}*|если|вдруг|боял\\p{L}*|ждал\\p{L}*|хотел\\p{L}*|мечтал\\p{L}*|будто|словно|forecast|if|hope\\p{L}*)' + Z, 'iu');
-const AFTER = new RegExp('^\\s*(?:\\p{L}+\\s+){0,2}?(?:не\\s+было|не\\s+был|не\\s+шел|не\\s+пош\\p{L}*|не\\s+выпал\\p{L}*|не\\s+случил\\p{L}*|так\\s+и\\s+не|нет|жоқ|болмады|емес|не\\s+дождал\\p{L}*|не\\s+состоял\\p{L}*|отменил\\p{L}*)' + Z, 'iu');
+const BEFORE = new RegExp(A + '(?:не|нет|без|ни|no|not|without|never|didn\'t|wasn\'t|isn\'t|жоқ|емес|обещал\\p{L}*|прогноз\\p{L}*|ертең|если|вдруг|боял\\p{L}*|ждал\\p{L}*|хотел\\p{L}*|мечтал\\p{L}*|будто|словно|forecast|if|hope\\p{L}*)' + Z, 'iu');
+const AFTER = new RegExp('^\\s*(?:\\p{L}+\\s+){0,2}?(?:не\\s+был(?:о|и|а)?|не\\s+шел|не\\s+пош\\p{L}*|не\\s+выпал\\p{L}*|не\\s+случил\\p{L}*|так\\s+и\\s+не|нет|жоқ|болмады|емес|тойлама\\p{L}*|не\\s+дождал\\p{L}*|не\\s+состоял\\p{L}*|отменил\\p{L}*)' + Z, 'iu');
 const STRONG = new RegExp(A + '(?:сильн|проливн|тяжел|густ|плотн|ужасн|жутк|страшн|сплошн|стеной|бешен|heavy|thick|strong|hard|қатты)', 'iu');
 const SOFT = new RegExp(A + '(?:мелк|легк|слаб|тонк|немного|слегка|чуть|редк|тих|небольш|light|slight|little|gentle|soft|сәл)', 'iu');
 
@@ -47,12 +49,12 @@ function around(text, index, length) {
 const denied = (near) => BEFORE.test(near.before) || AFTER.test(near.after);
 
 // The words of the entry that justify a sign, as the author wrote them.
-function quote(original, index, length, near) {
-  const clause = original.slice(near.start, near.end).trim();
+function quote(originalSpan, index, length, near) {
+  const clause = originalSpan(near.start, near.end).trim();
   if (clause.length <= 56) return clause.replace(/^[\s,—–-]+|[\s,:—–-]+$/gu, '');
-  const left = original.slice(Math.max(near.start, index - 26), index).replace(/^\S*\s/u, '');
-  const right = original.slice(index + length, Math.min(near.end, index + length + 26)).replace(/\s\S*$/u, '');
-  return (left + original.slice(index, index + length) + right).trim().replace(/[\s,:—–-]+$/u, '');
+  const left = originalSpan(Math.max(near.start, index - 26), index).replace(/^\S*\s/u, '');
+  const right = originalSpan(index + length, Math.min(near.end, index + length + 26)).replace(/\s\S*$/u, '');
+  return (left + originalSpan(index, index + length) + right).trim().replace(/[\s,:—–-]+$/u, '');
 }
 
 // ---------------------------------------------------------------------------
@@ -108,7 +110,7 @@ const round = value => Math.round(value * 100) / 100;
 // Returns a small serialisable object; `occasion` is null when no holiday is named.
 export function readContext(story, date) {
   const original = String(story || '');
-  const text = original.toLowerCase().replace(/ё/g, 'е');
+  const {text, quote: originalSpan} = normalizeContextText(original);
   const evidence = [];
 
   // Holidays read the text as written (Дед Мороз is a sign of New Year, not of frost).
@@ -122,7 +124,7 @@ export function readContext(story, date) {
         const near = around(text, m.index, m[0].length);
         if (denied(near) || REFUSED.test(text.slice(near.start, near.end))) continue;
         score += weight;
-        if (weight > strongest) { strongest = weight; said = quote(original, m.index, m[0].length, near); }
+        if (weight > strongest) { strongest = weight; said = quote(originalSpan, m.index, m[0].length, near); }
         break;
       }
     }
@@ -142,7 +144,7 @@ export function readContext(story, date) {
         if (denied(near)) continue;
         const words = near.before + ' ' + near.after.split(/\s+/).slice(0, 3).join(' ');
         const value = STRONG.test(words) ? Math.max(base, .95) : SOFT.test(words) ? Math.min(base, .35) : base;
-        if (value > amount) { amount = value; said = quote(original, m.index, m[0].length, near); }
+        if (value > amount) { amount = value; said = quote(originalSpan, m.index, m[0].length, near); }
       }
     }
     if (amount) { weather.push({kind, amount: round(amount)}); evidence.push({of: kind, text: said}); }
@@ -161,20 +163,27 @@ export function contextSVG(context, imprint, seed, size = 1) {
 }
 
 const OCCASION = {
-  halloween: ['Хэллоуин', 'тыквы, призраки, летучие мыши и паутина по краям кадра и по всей странице'],
-  newyear: ['Новый год', 'ёлки, снежинки, шары и гирлянда по верху кадра и страницы'],
-  birthday: ['День рождения', 'воздушные шары, свечи, флажки и конфетти в кадре и на полях страницы'],
-  nauryz: ['Наурыз', 'тюльпаны, подснежники, шаңырақ, орнамент «қошқар мүйіз» и алтыбақан']
+  halloween: ['Хэллоуин', 'тыквы, летучие мыши и паутина по краям кадра, по странице летят полупрозрачные призраки'],
+  newyear: ['Новый год', 'ёлки, шары и гирлянда по верху кадра и страницы, по всей странице идёт небольшой снег и ложится на её края'],
+  birthday: ['День рождения', 'свечи и флажки в кадре, по странице поднимаются воздушные шары и сыплется конфетти'],
+  nauryz: ['Наурыз', 'тюльпаны, шаңырақ и орнамент «қошқар мүйіз», по странице летят лепестки и ласточки, у нижнего края растёт молодая трава']
 };
 // [light, plain, strong] wording of each sign.
 const SKY = {
-  sun: ['солнце с лучами'], clouds: ['лёгкие облака', 'облака', 'тяжёлые тучи'], storm: ['туча с молнией'],
-  rain: ['морось из облака', 'дождь из облака', 'ливень из двух туч'], snow: ['редкий снег из облака', 'снег из облака и снежинки по верху кадра', 'сильный снег из двух туч'],
+  sun: ['солнце с лучами'], clouds: ['лёгкие облака плывут через страницу', 'облака плывут через страницу', 'тяжёлые тучи плывут через страницу'], storm: ['туча с молнией'],
+  rain: ['морось: редкие капли падают по странице и отскакивают от её краёв', 'дождь: капли падают по всей странице и отскакивают от её краёв', 'ливень: капли бьют по всей странице и отскакивают от её краёв'], snow: ['редкий снег падает по странице и ложится на её края, его можно смахнуть', 'снег падает по всей странице и ложится на её края, его можно смахнуть', 'сильный снег ложится на края страницы, его можно смахнуть'],
   wind: ['лёгкий ветер: две линии с завитком', 'ветер: линии с завитком', 'сильный ветер: три линии с завитком'],
   fog: ['дымка: тонкие полосы тумана', 'полосы тумана', 'густой туман: плотные полосы'],
   heat: ['жара: солнце с дрожащими лучами'], frost: ['иней в углу кадра']
 };
-const wording = (kind, amount) => { const w = SKY[kind]; return w.length === 1 ? w[0] : w[amount <= .4 ? 0 : amount >= .9 ? 2 : 1]; };
+const WEATHER_NAMES = {
+  sun: 'Солнце', clouds: 'Облака', storm: 'Гроза', rain: 'Дождь', snow: 'Снег',
+  wind: 'Ветер', fog: 'Туман', heat: 'Жара', frost: 'Иней'
+};
+
+export const occasionNames = () => Object.entries(OCCASION).map(([kind, [label]]) => [kind, t(label)]);
+export const weatherNames = () => Object.entries(WEATHER_NAMES).map(([kind, label]) => [kind, t(label)]);
+const wording = (kind, amount) => { const w = SKY[kind]; return t(w.length === 1 ? w[0] : w[amount <= .4 ? 0 : amount >= .9 ? 2 : 1]); };
 
 // Lines for «Как собрана сцена»: [{label: 'Хэллоуин', text: 'тыквы и призраки по краям кадра'}].
 export function contextRules(context) {
@@ -183,11 +192,11 @@ export function contextRules(context) {
   const rules = [];
   if (OCCASION[context.occasion]) {
     const [label, text] = OCCASION[context.occasion];
-    rules.push({label, text: `${text}: в записи ${said(context.occasion) ? `«${said(context.occasion)}»` : 'назван праздник'}`});
+    rules.push({label: t(label), text: t`${t(text)}: в записи ${said(context.occasion) ? `«${said(context.occasion)}»` : t('назван праздник')}`});
   }
   for (const {kind, amount} of context.weather || []) {
     const words = said(kind);
-    rules.push({label: 'Погода', text: `${wording(kind, amount)}${words ? `: в записи «${words}»` : ''}`});
+    rules.push({label: t('Погода'), text: `${wording(kind, amount)}${words ? t`: в записи «${words}»` : ''}`});
   }
   return rules;
 }

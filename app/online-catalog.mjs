@@ -1,3 +1,4 @@
+import {t} from './i18n.mjs';
 const endpoint = 'https://api.openverse.org/v1/audio/';
 const pageSize = 12;
 const cache = new Map();
@@ -52,7 +53,7 @@ function normalizeTrack(row) {
 // Send only the musical search terms. Results remain in this tab's memory.
 export async function searchMusic({query, page = 1, signal}) {
   const terms = String(query ?? '').trim().replace(/\s+/g, ' ').slice(0, 160);
-  if (!terms || !Number.isSafeInteger(page) || page < 1) throw Error('Нужны музыкальная тема и номер страницы.');
+  if (!terms || !Number.isSafeInteger(page) || page < 1) throw Error(t('Нужны музыкальная тема и номер страницы.'));
   signal?.throwIfAborted();
   const url = new URL(endpoint);
   url.search = new URLSearchParams({
@@ -73,11 +74,11 @@ export async function searchMusic({query, page = 1, signal}) {
     if (response.ok) data = await response.json();
   } catch {
     signal?.throwIfAborted();
-    if (timeout.aborted) throw Error('Openverse долго отвечает. Повторите поиск.');
-    throw Error('Не удалось загрузить музыку из Openverse. Проверьте интернет и повторите поиск.');
+    if (timeout.aborted) throw Error(t('Openverse долго отвечает. Повторите поиск.'));
+    throw Error(t('Не удалось загрузить музыку из Openverse. Проверьте интернет и повторите поиск.'));
   }
-  if (response.status === 429) throw Error('Лимит запросов Openverse исчерпан. Повторите поиск позже.');
-  if (!response.ok || !Array.isArray(data?.results)) throw Error('Каталог Openverse временно недоступен. Повторите поиск.');
+  if (response.status === 429) throw Error(t('Лимит запросов Openverse исчерпан. Повторите поиск позже.'));
+  if (!response.ok || !Array.isArray(data?.results)) throw Error(t('Каталог Openverse временно недоступен. Повторите поиск.'));
 
   const tracks = data.results.map(normalizeTrack).filter(Boolean);
   const result = {tracks, page, hasMore: page < data.page_count};

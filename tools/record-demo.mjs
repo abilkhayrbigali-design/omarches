@@ -147,13 +147,13 @@ await pause(1.2);
 
 // 1. The diary as it is.
 say('«Оттиск» — дневник, который хранит не только кадры, но и ощущение дня');
-await pause(4.2);
+await pause(3.6);
 say('У дневника есть настроение: восемь чисел в четырёх парах противоположностей');
 await glide('.diary-mood');
-await pause(4.4);
+await pause(3.6);
 await glide('#archive-grid', 'start');
 say('Каждый день оформлен по-своему, но это страницы одного дневника');
-await pause(4);
+await pause(3.2);
 await top();
 
 // 2. A new day: text, photographs, a song.
@@ -170,13 +170,13 @@ if (await page.isVisible('#ai-consent')) {
   await point('#ai-consent');
   if (day.ai) await click('input[name=useAI]');
 }
-await pause(3.2);
+await pause(2.6);
 say('Шаг 2. Фотографии дня');
 await click('#next-step');
 await pause(.7);
 await point('input[name=photos]');
 await page.setInputFiles('input[name=photos]', day.photos);
-await pause(3);
+await pause(2.4);
 say('Шаг 3. Песня дня: свой файл, ссылка или подбор из открытого каталога');
 await click('#next-step');
 // The catalogue search starts by itself on this step; let its list settle before choosing a mode.
@@ -194,7 +194,7 @@ if (day.song.catalog) {
     }
     await click(wanted);
   } else await point('#music-picks .music-option');
-  await pause(2.4);
+  await pause(1.8);
   credit = await page.evaluate(() => ({title: document.querySelector('#preview-title').textContent,
     terms: document.querySelector('#catalog-credit').textContent, url: document.querySelector('#music-preview').src}));
   fs.writeFileSync(songFile, Buffer.from(await (await fetch(credit.url)).arrayBuffer()));
@@ -210,28 +210,32 @@ await click('#day-form [type=submit]');
 await page.waitForSelector('.memory', {timeout: 60000});
 const dayTitle = await page.textContent('#day-heading');
 await listen('.transport audio', 'music');
-await pause(4.2);
+await pause(3.4);
 
 // 3. The memory.
 say('Сцена собрана из текста, фото и песни. Темп музыки задаёт ритм кадров');
 await click('#play');
 await page.mouse.move(WIDTH * .78, HEIGHT * .3, {steps: 20});
-await pause(6.2);
+await pause(5.2);
 // A holiday or the weather named in the entry is drawn on the scene: point it out when it is there.
-if (await page.locator('.memory .decor').count()) say('В записи назван праздник или погода, и на сцене появились их знаки');
-await pause(6.3);
-await click('#play');
+if (await page.locator('.d-air').count()) say('В записи назван праздник: его знаки на сцене, а по всей странице он идёт в темпе дня');
+else if (await page.locator('.memory .decor').count()) say('В записи назван праздник или погода, и на сцене появились их знаки');
+await pause(5.2);
+// The song keeps playing under the explanation and the sliders; it stops before the voice reads.
 say('Оттиск и правила объясняют, почему день выглядит именно так');
 await glide('#day-stamp');
-await pause(3.6);
+await pause(3);
 await glide('#day-rules');
-await pause(3.6);
+await pause(3);
 say('Песня тоже разобрана: темп, лад и то, как она сдвинула числа');
 await glide('#music-line');
-await pause(3.6);
+await pause(3);
+say('Движение тоже считается из чисел: пружина, направление и пауза между элементами');
+await glide('#motion-line');
+await pause(3.4);
 
 // 4. The numbers can be corrected; the scene and the site follow at once.
-say('Числа можно поправить: кадр, сцена и весь сайт меняются сразу');
+say('Числа можно поправить: кадр, сцена, движение и весь сайт меняются сразу');
 await click('.tune summary');
 await pause(.8);
 const slide = async (name, value) => {
@@ -243,7 +247,7 @@ const before = await page.evaluate(() => Object.fromEntries([...document.querySe
 await slide('tension', .92);
 await slide('calm', .04);
 await top();
-await pause(3.2);
+await pause(2.6);
 if (day.ai && await page.isVisible('#reread')) {
   say('Одна кнопка возвращает прочтение модели OpenAI');
   await click('#reread');
@@ -255,7 +259,9 @@ if (day.ai && await page.isVisible('#reread')) {
 }
 await pause(1.2);
 await top();
-await pause(2.4);
+await pause(1.6);
+await click('#play');
+await pause(.8);
 
 // 5. Narration.
 say('Запись можно послушать: голос читает её с паузами и темпом текста');
@@ -287,22 +293,28 @@ if (await page.evaluate(title => document.querySelector('.featured h2')?.textCon
 } else {
   // A day from the past takes its place by date; the diary is replayed in order with it.
   say('Запись встала в архив по своей дате, и числа дневника пересчитались по всем дням по порядку');
-  await pause(2);
+  await pause(1.6);
   await glide('.diary-mood');
-  await pause(3.6);
+  await pause(3);
   await glide(`.day-card:has-text(${JSON.stringify(dayTitle)})`);
-  await pause(3.4);
+  await pause(2.8);
 }
-say('У напряжённого дня другой шрифт, сетка и прямые углы — меняется весь сайт');
+say('Композиция меняется с настроением. У радостного дня светлая страница, кадр лежит отпечатком');
 await glide('#archive-grid', 'start');
 await pause(1);
+await click('.day-card[href="#day/train"]');
+await pause(3.8);
+await click('.back');
+await page.waitForSelector('.day-card');
+say('Карточка вырастает в сцену. У напряжённого дня сетка, рубленый шрифт и резкое движение');
+await pause(.8);
 await click('.day-card[href="#day/office"]');
-await pause(5);
+await pause(4.4);
 say('Папка дня: текст, фото, песня, сцена и озвучка в одном архиве');
 const saved = page.waitForEvent('download').catch(() => null);
 await click('#download');
 await saved;
-await pause(3.6);
+await pause(3);
 say(null);
 
 const length = clock();

@@ -1,10 +1,11 @@
+import {language, t} from './i18n.mjs';
 // Markup for a memory, built only from strings so the page and the exported
 // folder draw a day in exactly the same way.
 import {FEELINGS, IDS, PAIRS, clamp, feelingName, motionTokens, opposite} from './feelings.mjs';
 import {contextRules, contextSVG} from './context.mjs';
 
 export const escape = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-export const number = value => Number(value).toFixed(2).replace('.', ',');
+export const number = value => Number(value).toFixed(2).replace('.', language === 'en' ? '.' : ',');
 const colour = (id, light = 62) => {
   const feeling = FEELINGS.find(item => item.id === id);
   return `hsl(${feeling.hue} ${Math.max(feeling.sat, 38)}% ${light}%)`;
@@ -24,7 +25,8 @@ export function motionVars(motion) {
     '--wipe': m.wipe ? '104%' : '-20%', '--title-ghost': m.wipe ? '1' : '0',
     '--hover-zoom': String(m.hoverZoom), '--hover-time': `${m.hoverTime}s`, '--press': `${m.pressDepth}px`,
     '--cam-back': String(m.camBack), '--cam-y': `${m.camY}%`, '--cam-pad': String(m.camPad), '--cam-ease': m.camEase,
-    '--ambient': `${m.ambient}s`, '--swell': String(m.swell)
+    '--ambient': `${m.ambient}s`, '--swell': String(m.swell),
+    '--pace': String(m.pace), '--sway': `${m.sway}px`, '--air-ease': m.airEase
   };
 }
 
@@ -45,11 +47,23 @@ export function sceneStyle(imprint) {
 // whole diary) and an open day (from that day alone).
 export function themeVars(tokens) {
   const {hue, paperSat: sat, paperLight: base} = tokens;
-  const light = shift => Math.round((base + shift) * 100) / 100;
+  // A print day is set on light paper in dark ink; the same properties, the other way round.
+  const day = Boolean(tokens.light);
+  const light = shift => Math.min(100, Math.round((day ? 93 + shift * .9 : base + shift) * 100) / 100);
+  const ink = day ? {
+    '--edge': `hsl(${hue} 25% 18% / ${(tokens.edge ?? .16) + .05})`,
+    '--text': `hsl(${hue} 30% 13%)`,
+    '--muted': `hsl(${hue} 14% 34%)`,
+    '--accent': `hsl(${tokens.accentHue} ${Math.min(62, tokens.accentSat)}% 33%)`,
+    '--accent-hi': `hsl(${tokens.accentHue} ${Math.min(62, tokens.accentSat)}% 27%)`,
+    '--on-accent': `hsl(${tokens.accentHue} 40% 96%)`,
+    '--glow': `hsl(${hue} 85% 72% / ${tokens.glow})`,
+    '--vignette': '0', '--line-ink': '0 0% 0%', '--grain-blend': 'multiply', '--danger': 'hsl(16 72% 36%)', '--shadow': '#0003', 'color-scheme': 'light'
+  } : {'--line-ink': '0 0% 100%', '--grain-blend': 'screen', '--danger': '#ffd0ab', '--shadow': '#0008', 'color-scheme': 'dark'};
   return {
     '--paper': `hsl(${hue} ${sat}% ${light(0)}%)`,
     '--surface': `hsl(${hue} ${sat}% ${light(4)}%)`,
-    '--well': `hsl(${hue} ${sat}% ${Math.max(4, light(-2.5))}%)`,
+    '--well': `hsl(${hue} ${sat}% ${day ? light(-5) : Math.max(4, light(-2.5))}%)`,
     '--raise': `hsl(${hue} ${sat + 4}% ${light(8)}%)`,
     // A translucent light line reads as structure on any tinted paper.
     '--edge': `hsl(${hue} ${Math.min(40, sat + 10)}% 86% / ${tokens.edge ?? .16})`,
@@ -73,9 +87,21 @@ export function themeVars(tokens) {
     '--vignette': String(tokens.vignette ?? 0),
     '--leading': String(tokens.leading ?? 1.7),
     '--measure': `${tokens.measure ?? 62}ch`,
-    ...(tokens.motion ? motionVars(tokens.motion) : {})
+    ...(tokens.motion ? motionVars(tokens.motion) : {}),
+    ...ink
   };
 }
+
+// The composition of a scene, in the diary's own words.
+const PLACES = {
+  base: 'Слова лежат на кадре, слева внизу: ровный или тёплый день держится за фотографию.',
+  grid: 'Слова вверху, у акцентной полосы и по сетке: напряжение выше половины.',
+  burst: 'Заголовок крупный, по центру и с наклоном: праздник выше 0,55.',
+  low: 'Кадр обрезан и уходит в темноту, слова в дальнем нижнем углу: день ведёт грусть.',
+  air: 'Небольшой кадр в широких полях, подпись под ним: уединение или тишина.',
+  print: 'Светлый отпечаток с подписью на нижнем поле, и вся страница светлая: день ведёт радость, а кадр не ночной.'
+};
+export const placeLine = imprint => t(PLACES[imprint.place] || PLACES.base);
 export const themeStyle = tokens => Object.entries(themeVars(tokens)).map(([name, value]) => `${name}:${value}`).join(';');
 
 // ---------------------------------------------------------------------------
@@ -160,7 +186,7 @@ export function stampSVG(feelings, {labels = false, title = ''} = {}) {
     return `<text x="${x.toFixed(1)}" y="${top}" text-anchor="${anchor}">${feelingName(id)}<tspan class="num" x="${x.toFixed(1)}" dy="11">${number(feelings[id])}</tspan></text>`;
   }).join('') : '';
   const box = labels ? '-104 -76 208 154' : '-50 -50 100 100';
-  return `<svg class="stamp${labels ? ' labelled' : ''}" viewBox="${box}" role="img" aria-label="${escape(title || 'Оттиск настроения')}">
+  return `<svg class="stamp${labels ? ' labelled' : ''}" viewBox="${box}" role="img" aria-label="${escape(title || t('Оттиск настроения'))}">
     <g class="guide"><circle r="46"/>${axes}</g><path class="shape" d="${path}Z"/>${captions}</svg>`;
 }
 
@@ -260,8 +286,8 @@ export const layersHTML = (imprint, seed, {motif = true} = {}) =>
 export function sceneHTML(day, sources, dateText, heading = 'h1') {
   const i = day.imprint;
   const frames = sources.map((source, index) => `<img class="frame${index ? '' : ' visible'}" src="${escape(source)}" alt="">`).join('');
-  const dots = sources.length > 1 ? `<div class="positions" aria-label="Кадры">${sources.map((_, index) =>
-    `<button class="dot" type="button" data-index="${index}" aria-label="Кадр ${index + 1}" aria-pressed="${index === 0}"></button>`).join('')}</div>` : '';
+  const dots = sources.length > 1 ? `<div class="positions" aria-label="${t("Кадры")}">${sources.map((_, index) =>
+    `<button class="dot" type="button" data-index="${index}" aria-label="${t`Кадр ${index + 1}`}" aria-pressed="${index === 0}"></button>`).join('')}</div>` : '';
   const treat = treatment(i, 's-' + day.id);
   return `<section class="memory" data-face="${i.face}" data-place="${i.place}" data-duration="${i.duration}"${treat.attr} style="${sceneStyle(i)}${treat.style}">
     ${treat.svg}<div class="frames" aria-hidden="true">${frames}</div>${layersHTML(i, day.id)}
@@ -283,21 +309,21 @@ export function pairsHTML(feelings, previous) {
     const a = feelings[pair.a];
     const b = feelings[pair.b];
     const lean = a - b;
-    const note = Math.abs(lean) < .12 ? (a + b < .3 ? 'без сдвига' : 'обе стороны слышны, ни одна не глушит другую')
+    const note = Math.abs(lean) < .12 ? (a + b < .3 ? t('без сдвига') : t('обе стороны слышны, ни одна не глушит другую'))
       : lean > 0 ? pair.more : pair.less;
     return `<div class="pair">
       <span class="pole">${shift(a, previous?.[pair.a])}<span>${feelingName(pair.a)}</span><b>${number(a)}</b></span>
       <span class="meter" aria-hidden="true"><i class="to-a" style="--v:${a};--c:${colour(pair.a)}"></i><i class="to-b" style="--v:${b};--c:${colour(pair.b)}"></i></span>
       <span class="pole end"><b>${number(b)}</b><span>${feelingName(pair.b)}</span>${shift(b, previous?.[pair.b])}</span>
-      <small>${pair.layer}: ${note}.</small>
+      <small>${t(pair.layer)}: ${t(note)}.</small>
     </div>`;
   }).join('')}</div>`;
 }
 
 export function tuneHTML(feelings) {
   const row = id => `<label>${feelingName(id)}<input type="range" min="0" max="1" step="0.01" name="${id}" value="${feelings[id]}"><output>${number(feelings[id])}</output></label>`;
-  return `<details class="tune"><summary>Поправить числа</summary>
-    <p class="hint">Если день прочитан не так, подвиньте числа. Сцена и оформление сайта изменятся сразу.</p>
+  return `<details class="tune"><summary>${t("Поправить числа")}</summary>
+    <p class="hint">${t("Если день прочитан не так, подвиньте числа. Сцена и оформление сайта изменятся сразу.")}</p>
     <div class="tune-grid">${PAIRS.map(pair => row(pair.a) + row(pair.b)).join('')}</div></details>`;
 }
 
@@ -306,20 +332,20 @@ export function rulesHTML(imprint) {
   const f = imprint.feelings;
   const rules = [];
   const say = (id, text) => { if (f[id] >= .3) rules.push([id, text]); };
-  say('joy', 'кадр светлее, цвета насыщеннее');
-  say('sadness', 'кадр темнее и глуше, по краям тень' + ((imprint.matte ?? 0) >= .15 ? ', тени выцветают в серую дымку, как на старом отпечатке, цвет кадра бледнеет' : ''));
+  say('joy', t('кадр светлее, цвета насыщеннее'));
+  say('sadness', t('кадр темнее и глуше, по краям тень') + ((imprint.matte ?? 0) >= .15 ? t(', тени выцветают в серую дымку, как на старом отпечатке, цвет кадра бледнеет') : ''));
   const shown = value => value >= TREAT_FROM;
   // Calm gives no colour of its own; the line says so only when it would otherwise have given one.
-  const plain = imprint.lead === 'calm' || imprint.second === 'calm' ? ', своего цвета не даёт: сцена в одном цвете, акцент — светлый тон того же цвета' : '';
-  say('calm', 'мягкие углы, длинные растворения' + plain + (!shown(imprint.paint) ? '' : imprint.sweep >= .45 ? ', кадр ложится длинными ровными мазками' : ', кадр распадается на короткие мазки'));
-  say('tension', (imprint.face === 'grotesk' ? 'сетка, рубленый заголовок, резкие склейки' : 'контраст выше, углы острее') + (shown(imprint.plane) ? ', кадр собран в плоскости цвета' : ''));
-  say('festive', 'световые следы, крупный заголовок, быстрый ритм' + (shown(imprint.smear) ? ', свет на кадре тянется, как при длинной выдержке' : ''));
-  say('quiet', 'мало движения, заголовок меньше, графика приглушена');
-  say('warmth', 'тёплая засветка и плёночное зерно');
-  say('solitude', 'поля вокруг кадра, линия горизонта, цвет кадра уходит в холодный воздух, как у дальних гор');
+  const plain = imprint.lead === 'calm' || imprint.second === 'calm' ? t(', своего цвета не даёт: сцена в одном цвете, акцент — светлый тон того же цвета') : '';
+  say('calm', t('мягкие углы, длинные растворения') + plain + (!shown(imprint.paint) ? '' : imprint.sweep >= .45 ? t(', кадр ложится длинными ровными мазками') : t(', кадр распадается на короткие мазки')));
+  say('tension', (imprint.face === 'grotesk' ? t('сетка, рубленый заголовок, резкие склейки') : t('контраст выше, углы острее')) + (shown(imprint.plane) ? t(', кадр собран в плоскости цвета') : ''));
+  say('festive', t('световые следы, крупный заголовок, быстрый ритм') + (shown(imprint.smear) ? t(', свет на кадре тянется, как при длинной выдержке') : ''));
+  say('quiet', t('мало движения, заголовок меньше, графика приглушена'));
+  say('warmth', t('тёплая засветка и плёночное зерно'));
+  say('solitude', t('поля вокруг кадра, линия горизонта, цвет кадра уходит в холодный воздух, как у дальних гор'));
   // What the entry is about (a holiday, the weather) is listed after what it felt like.
   const signs = contextRules(imprint.context).map(rule => `<li><b>${escape(rule.label)}</b> ${escape(rule.text)}</li>`).join('');
-  if (!rules.length && !signs) return '<p class="hint">Ярких чувств в записи не нашлось, поэтому сцена оформлена нейтрально.</p>';
+  if (!rules.length && !signs) return `<p class="hint">${t("Ярких чувств в записи не нашлось, поэтому сцена оформлена нейтрально.")}</p>`;
   return `<ul class="rules">${rules.sort((a, b) => f[b[0]] - f[a[0]]).map(([id, text]) =>
     `<li><b>${feelingName(id)} ${number(f[id])}</b> ${text}</li>`).join('')}${signs}</ul>`;
 }

@@ -3,16 +3,20 @@
 // the diary's own model on the device, and the dictionary as the last resort.
 import {cleanFeelings, localReading, localTitle} from './feelings.mjs';
 import {ownReading} from './own-model.mjs';
+import {language, storyLanguage} from './i18n.mjs';
 
 export async function readingStatus() {
-  try {
-    const response = await fetch('/api/reading/status', {cache: 'no-store', signal: AbortSignal.timeout(4000)});
-    if (response.ok) {
-      const info = await response.json();
-      return {available: Boolean(info.available), model: String(info.model ?? ''), server: true, hosted: Boolean(info.hosted)};
-    }
-  } catch { /* A static copy of the diary has no server. */ }
-  return {available: false, model: '', server: false, hosted: false};
+  const status = async path => {
+    try {
+      const response = await fetch(path,{cache:'no-store',signal:AbortSignal.timeout(4000)});
+      return response.ok ? await response.json() : null;
+    } catch { return null; }
+  };
+  const [info, enhanced] = await Promise.all([status('/api/reading/status'),status('/api/mood')]);
+  return {
+    available:Boolean(info?.available), model:String(info?.model ?? ''),
+    server:Boolean(info || enhanced), hosted:Boolean(info?.hosted), enhanced:Boolean(enhanced?.available)
+  };
 }
 
 // Without the outside model, the diary's own model reads on the device; the dictionary
@@ -21,12 +25,15 @@ async function readHere(story) {
   return await ownReading(story) ?? localReading(story);
 }
 
-export async function readStory(story, useModel) {
-  if (!useModel) return readHere(story);
+export async function readStory(story, mode) {
+  if (!mode) return readHere(story);
+  const enhanced = mode==='server';
+  const reasonLanguage = language;
+  const entryLanguage = storyLanguage(story);
   try {
-    const response = await fetch('/api/reading', {
+    const response = await fetch(enhanced ? '/api/mood' : '/api/reading', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({story}), signal: AbortSignal.timeout(45000)
+      body: JSON.stringify({story, reasonLanguage, language:entryLanguage}), signal: AbortSignal.timeout(enhanced ? 58000 : 45000)
     });
     if (response.ok) {
       const data = await response.json();
@@ -34,10 +41,12 @@ export async function readStory(story, useModel) {
       const count = title.split(/\s+/).filter(Boolean).length;
       return {
         feelings: cleanFeelings(data.feelings),
-        title: count >= 2 && count <= 8 && title.length <= 90 ? title : localTitle(story),
-        reason: String(data.reason ?? '').slice(0, 240), model: String(data.model ?? ''), source: 'ai'
+        title: count >= 2 && count <= 8 && title.length <= 90 ? title : localTitle(story, entryLanguage),
+        reason:String(data.reason ?? '').slice(0, 240), reasonLanguage, language:entryLanguage,
+        evidence:enhanced ? data.evidence : undefined, model:String(data.model ?? ''),
+        source:enhanced ? 'server' : 'ai'
       };
     }
   } catch { /* Offline or timed out: the reader on the device answers instead. */ }
-  return {...await readHere(story), fallback: true};
+  return {...await readHere(story), fallback: enhanced ? 'server' : 'ai'};
 }

@@ -2,23 +2,56 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {BITS, ORDER, featurize, sigmoid} from '../../app/own-model.mjs';
+import {BITS, ORDER, compileLexicon, featurize, sigmoid} from '../../app/own-model.mjs';
+import {storyLanguage} from '../../app/i18n.mjs';
 
 export const here = path.dirname(fileURLToPath(import.meta.url));
 export const modelDir = path.resolve(here, '../../app/model');
 export const SIZE = 1 << BITS;
 const F = ORDER.length;
 
+// The lexicon is kept as one file per language in ./lexicon and merged here: every cue once per feeling.
+export function lexiconLists() {
+  const dir = path.join(here, 'lexicon');
+  const lists = Object.fromEntries(ORDER.map(id => [id, []]));
+  if (!fs.existsSync(dir)) return lists;
+  for (const name of fs.readdirSync(dir).filter(name => name.endsWith('.json')).sort()) {
+    const file = JSON.parse(fs.readFileSync(path.join(dir, name), 'utf8'));
+    for (const id of ORDER) for (const cue of file[id] || []) {
+      const clean = String(cue).toLowerCase().replaceAll('ё', 'е').trim();
+      // A plain stem shorter than four letters matches too much; such cues must be exact or a pair.
+      const text = clean.split(':')[0];
+      if (!text || (!text.startsWith('=') && !text.includes(' ') && text.length < 4)) continue;
+      if (!lists[id].some(known => known.split(':')[0] === text)) lists[id].push(clean);
+    }
+  }
+  return lists;
+}
+export const lexicon = compileLexicon(lexiconLists());
+
 export function corpus(prefix) {
   const dir = path.join(here, 'corpus');
   return fs.readdirSync(dir).filter(name => name.startsWith(prefix) && name.endsWith('.jsonl')).sort()
-    .flatMap(name => fs.readFileSync(path.join(dir, name), 'utf8').split('\n').filter(line => line.trim()).map(line => JSON.parse(line)));
+    .flatMap(name => fs.readFileSync(path.join(dir, name), 'utf8').split('\n').filter(line => line.trim())
+      // The letter after the prefix is the topic the file belongs to (train-a1 … train-a4 are one topic).
+      .map(line => ({...JSON.parse(line), topic: name.slice(prefix.length, prefix.length + 1)})));
 }
 
 // Soft-label logistic regression per feeling, AdaGrad, L2 on the weights a step touches.
 // useDictionary=false trains the text features alone, to see what the dictionary adds.
-export function train(items, {epochs = 40, rate = .3, l2 = 1e-4, useDictionary = true, seed = 7} = {}) {
-  const data = items.map(item => ({x: featurize(item.text), y: item.f}));
+export function train(items, {epochs = 40, rate = .3, l2 = 1e-4, useDictionary = true, seed = 7, featureVersion = 2, balance = 0} = {}) {
+  const counts = {};
+  const langs = items.map(item => {
+    const lang = storyLanguage(item.text, 'ru');
+    counts[lang] = (counts[lang] || 0) + 1;
+    return lang;
+  });
+  const languageCount = Object.keys(counts).length;
+  const data = items.map((item, index) => ({
+    x: featurize(item.text, lexicon, featureVersion),
+    y: item.f,
+    weight: (items.length / (languageCount * counts[langs[index]])) ** balance
+  }));
   const denseSize = data[0].x.dense.length;
   const sparse = new Float32Array(SIZE * F), sparseG = new Float32Array(SIZE * F).fill(1e-6);
   const dense = ORDER.map(() => new Float64Array(denseSize)), denseG = ORDER.map(() => new Float64Array(denseSize).fill(1e-6));
@@ -28,13 +61,13 @@ export function train(items, {epochs = 40, rate = .3, l2 = 1e-4, useDictionary =
   for (let epoch = 0; epoch < epochs; epoch++) {
     for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(random() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
     for (const n of order) {
-      const {x, y} = data[n];
-      const xd = useDictionary ? x.dense : x.dense.map((v, k) => k < F ? 0 : v);
+      const {x, y, weight} = data[n];
+      const xd = useDictionary ? x.dense : x.dense.map((v, k) => k < 2 * F ? 0 : v);
       for (let f = 0; f < F; f++) {
         let z = 0;
         for (let k = 0; k < x.index.length; k++) z += sparse[x.index[k] * F + f] * x.value[k];
         for (let k = 0; k < denseSize; k++) z += dense[f][k] * xd[k];
-        const error = sigmoid(z) - y[f];
+        const error = (sigmoid(z) - y[f]) * weight;
         for (let k = 0; k < x.index.length; k++) {
           const at = x.index[k] * F + f;
           const g = error * x.value[k] + l2 * sparse[at];

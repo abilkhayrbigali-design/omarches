@@ -1,3 +1,4 @@
+import {serviceMessage, t} from './i18n.mjs';
 const maxFrames = 12;
 const maxBytes = 20 * 1024 * 1024;
 
@@ -47,7 +48,7 @@ export function setupImagePicker(form) {
       const remove = document.createElement('button');
       remove.type = 'button';
       remove.textContent = '×';
-      remove.setAttribute('aria-label','Убрать кадр «'+frame.file.name+'»');
+      remove.setAttribute('aria-label',t('Убрать кадр «')+frame.file.name+'»');
       remove.addEventListener('click', () => {
         frames.splice(frames.indexOf(frame),1);
         URL.revokeObjectURL(frame.url);
@@ -63,7 +64,7 @@ export function setupImagePicker(form) {
     const added = [...upload.files];
     upload.value = '';
     if (added.length + frames.length > maxFrames || added.some(file => !file.size || file.size > maxBytes)) {
-      status.textContent='Можно добавить до 12 кадров по 20 МБ. Выберите файлы меньшего размера или уберите лишние кадры.';
+      status.textContent=t('Можно добавить до 12 кадров по 20 МБ. Выберите файлы меньшего размера или уберите лишние кадры.');
       return;
     }
     for (const file of added) frames.push({file,url:URL.createObjectURL(file),origin:{type:'upload'}});
@@ -100,7 +101,7 @@ export function setupImagePicker(form) {
       // A copy on the web has no image generator: say what works here instead of reporting a fault.
       if (attempt === serial) {
         box.dataset.offline='';
-        status.textContent='Картинки по рассказу создаёт версия, запущенная на компьютере с ключом OpenAI. Здесь добавьте свои фотографии.';
+        status.textContent=t('Картинки по рассказу создаёт версия, запущенная на компьютере с ключом OpenAI. Здесь добавьте свои фотографии.');
       }
     } finally { if (attempt === serial) refreshCapacity(); }
   }
@@ -120,8 +121,8 @@ export function setupImagePicker(form) {
     let url;
     pending=controller;
     refreshCapacity();
-    make.textContent='Создаём изображение…';
-    status.textContent='OpenAI создаёт изображение по выбранному описанию…';
+    make.textContent=t('Создаём изображение…');
+    status.textContent=t('OpenAI создаёт изображение по выбранному описанию…');
     try {
       const response=await fetch('/api/image',{
         method:'POST',headers:{'Content-Type':'application/json'},
@@ -129,12 +130,12 @@ export function setupImagePicker(form) {
       });
       if (!response.ok) {
         const error = await response.json().catch(()=>({}));
-        throw Error(typeof error.message === 'string' ? error.message : 'Не удалось создать изображение. Попробуйте ещё раз.');
+        throw Error(serviceMessage(error.message, 'Не удалось создать изображение. Попробуйте ещё раз.'));
       }
       const model = decodeURIComponent(response.headers.get('X-Ottisk-Model') || service.model);
       const blob = await response.blob();
       if (!blob.type.startsWith('image/') || !blob.size || blob.size>maxBytes)
-        throw Error('Генератор вернул нечитаемый или слишком большой кадр.');
+        throw Error(t('Генератор вернул нечитаемый или слишком большой кадр.'));
       url = URL.createObjectURL(blob);
       const check = new Image();
       check.src=url;
@@ -142,20 +143,20 @@ export function setupImagePicker(form) {
       if (attempt !== serial) return;
       discardPreview();
       const extension = blob.type==='image/jpeg' ? 'jpg' : blob.type==='image/webp' ? 'webp' : 'png';
-      const file = new File([blob],'Иллюстрация '+(++generationNumber)+'.'+extension,{type:blob.type});
+      const file = new File([blob],t('Иллюстрация ')+(++generationNumber)+'.'+extension,{type:blob.type});
       candidate={file,url,origin:{type:'generated',provider,model,style:selectedStyle.textContent}};
       preview.src=url;
       url=null;
       review.hidden=false;
-      status.textContent='Иллюстрация готова. Добавьте её к кадрам или создайте другой вариант.';
+      status.textContent=t('Иллюстрация готова. Добавьте её к кадрам или создайте другой вариант.');
     } catch (error) {
-      if (attempt === serial) status.textContent = controller.signal.aborted ? 'Генератор долго не отвечал. Попробуйте ещё раз.' : error.message;
+      if (attempt === serial) status.textContent = controller.signal.aborted ? t('Генератор долго не отвечал. Попробуйте ещё раз.') : error.message;
     } finally {
       clearTimeout(timer);
       if (url) URL.revokeObjectURL(url);
       if (attempt === serial) {
         pending=null;
-        make.textContent=candidate ? 'Создать другой вариант' : 'Создать изображение';
+        make.textContent=candidate ? t('Создать другой вариант') : t('Создать изображение');
         refreshCapacity();
       }
     }
@@ -166,16 +167,16 @@ export function setupImagePicker(form) {
     frames.push(candidate);
     candidate=null;
     discardPreview();
-    make.textContent='Создать изображение';
-    status.textContent='Иллюстрация добавлена к кадрам дня.';
+    make.textContent=t('Создать изображение');
+    status.textContent=t('Иллюстрация добавлена к кадрам дня.');
     showFrames();
   });
 
   return {
     enter,
-    leave() { stopPending(); make.textContent=candidate?'Создать другой вариант':'Создать изображение'; },
+    leave() { stopPending(); make.textContent=candidate?t('Создать другой вариант'):t('Создать изображение'); },
     files() {
-      if (!frames.length) throw Error(candidate ? 'Нажмите «Добавить к кадрам», чтобы сохранить иллюстрацию.' : 'Добавьте фотографию или создайте изображение по рассказу.');
+      if (!frames.length) throw Error(candidate ? t('Нажмите «Добавить к кадрам», чтобы сохранить иллюстрацию.') : t('Добавьте фотографию или создайте изображение по рассказу.'));
       return frames.map(frame=>frame.file);
     },
     origins() { return frames.map(frame=>frame.origin); },

@@ -1,3 +1,4 @@
+import {t} from './i18n.mjs';
 const sampleRate = 24000;
 const tableLength = 2048;
 const tau = 2 * Math.PI;
@@ -131,10 +132,10 @@ function audioFile(buffer, beat, name) {
 
 export async function generateMusic({story, styleId, variant = 1}) {
   const text = String(story || '').trim().toLocaleLowerCase('ru').replace(/\s+/gu, ' ');
-  if (!text) throw new Error('Сначала добавьте текст о дне.');
+  if (!text) throw new Error(t('Сначала добавьте текст о дне.'));
   const style = styles[styleId];
-  if (!Object.hasOwn(styles, styleId)) throw new Error('Выберите характер музыки.');
-  if (!Number.isSafeInteger(variant) || variant < 1) throw new Error('Укажите положительный номер варианта.');
+  if (!Object.hasOwn(styles, styleId)) throw new Error(t('Выберите характер музыки.'));
+  if (!Number.isSafeInteger(variant) || variant < 1) throw new Error(t('Укажите положительный номер варианта.'));
   const random = randomSource(text + '|' + styleId + '|' + variant);
   const emphasis = Math.min(2, (text.match(/!/gu) || []).length);
   const bpm = style.bpm + Math.round((random() - .5) * 8) + emphasis;

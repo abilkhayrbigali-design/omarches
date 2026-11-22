@@ -1,3 +1,4 @@
+import {t} from './i18n.mjs';
 import {recommendTracks} from './recommend.mjs';
 
 // The nearest diary examples suggest sound, not a particular recording. Only
@@ -13,12 +14,12 @@ const atmospheres = {
 
 // Explicit instruments and genres take precedence over an inferred atmosphere.
 const instruments = [
-  ['piano', /пианино|фортепиано|роял[ьяеию]|\bpiano\b/u],
-  ['guitar', /гитар|\bguitar\b/u],
-  ['violin', /скрипк|\bviolin\b/u],
+  ['piano', /пианино|фортепиано|роял[ьяеию]|пианино|\bpiano\b/u],
+  ['guitar', /гитар|домбыра|\bguitar\b/u],
+  ['violin', /скрипк|қобыз|\bviolin\b/u],
   ['cello', /виолончел|\bcello\b/u],
   ['saxophone', /саксофон|\bsax(?:ophone)?\b/u],
-  ['flute', /флейт|\bflute\b/u],
+  ['flute', /флейт|сыбызғы|\bflute\b/u],
   ['jazz', /джаз|\bjazz\b/u],
   ['blues', /блюз|\bblues\b/u],
   ['classical', /классическ.{0,12}музык|оркестр|симфони|\bclassical\b/u],
@@ -31,7 +32,7 @@ const instruments = [
   ['ambient', /эмбиент|эмбиэнт|амбиент|\bambient\b/u],
   ['reggae', /регги|\breggae\b/u],
   ['acoustic', /акустич|акустик[ауе]|\bacoustic\b/u],
-  ['drums', /ударн(?:ые|ых|ыми)|барабан|\bdrums?\b/u]
+  ['drums', /ударн(?:ые|ых|ыми)|барабан|дабыл|дауылпаз|\bdrums?\b/u]
 ];
 
 const alternatives = {
@@ -52,7 +53,7 @@ function musicSignals(story) {
     const match = pattern.exec(text);
     if (!match) continue;
     const before = text.slice(Math.max(0, match.index - 35), match.index).trimEnd();
-    if (/(?:^|\s)(?:без|кроме|никаког[оа]|никаких|не хочу|не люблю|не нравится|не надо|только не)\s*$/u.test(before)) {
+    if (/(?:^|\s)(?:без|кроме|without|no|никаког[оа]|никаких|не хочу|не люблю|не нравится|не надо|только не)\s*$/u.test(before)) {
       omitted.add(term);
     } else {
       requested.push(term);
@@ -69,11 +70,11 @@ function musicSignals(story) {
 
 export function musicQuery(story) {
   const {requested, primary, terms} = musicSignals(story);
-  let reason = 'Подборка инструментальной музыки для вашей записи.';
+  let reason = t('Подборка инструментальной музыки для вашей записи.');
   if (requested.length) {
-    reason = 'В рассказе упоминается музыка. Поисковые теги — '+requested.join(', ')+'.';
+    reason = t('В рассказе упоминается музыка. Поисковые теги — ')+requested.join(', ')+'.';
   } else if (primary) {
-    reason = 'По описанию дня ищем музыку к '+primary.name+'.';
+    reason = t('По описанию дня ищем музыку к ')+t(primary.name)+'.';
   }
   return {terms, reason};
 }

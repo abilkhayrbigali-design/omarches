@@ -1,3 +1,4 @@
+import {t} from './i18n.mjs';
 import {cleanFeelings, feelingLabel, localReading, localTitle, sceneTokens, withMusic, withPhotos} from './feelings.mjs';
 import {readContext} from './context.mjs';
 
@@ -17,7 +18,7 @@ export async function photoStats(source) {
   let blob = source;
   if (typeof source === 'string') {
     const response = await fetch(source);
-    if (!response.ok) throw Error('Фотография недоступна.');
+    if (!response.ok) throw Error(t('Фотография недоступна.'));
     blob = await response.blob();
   }
   const image = await createImageBitmap(blob);
@@ -48,7 +49,7 @@ export async function photoStats(source) {
       bin.y+=Math.sin(h*Math.PI/180)*weight;
       bin.sat+=s*weight;
     }
-    if (!total) throw Error('Фотография полностью прозрачна.');
+    if (!total) throw Error(t('Фотография полностью прозрачна.'));
     const dominant=bins.reduce((a,b)=>a.count>b.count?a:b);
     const average=light/total;
     let spread=0, edges=0, pairs=0;
@@ -153,13 +154,13 @@ export function audioTone(samples, sampleRate) {
 
 export async function audioStats(file) {
   const Audio = window.AudioContext || window.webkitAudioContext;
-  if (!Audio) throw Error('Этот браузер не поддерживает анализ аудио. Можно добавить песню ссылкой.');
+  if (!Audio) throw Error(t('Этот браузер не поддерживает анализ аудио. Можно добавить песню ссылкой.'));
   const audio = new Audio();
   let buffer;
   try {
     buffer = await audio.decodeAudioData(await file.arrayBuffer());
   } catch {
-    throw Error('Не удалось открыть аудио. Попробуйте MP3, WAV или ссылку на трек.');
+    throw Error(t('Не удалось открыть аудио. Попробуйте MP3, WAV или ссылку на трек.'));
   } finally {
     await audio.close().catch(()=>{});
   }
@@ -200,22 +201,25 @@ export async function audioStats(file) {
   return {bpm:confidence ? Math.round(3000/lag):null, energy:clamp(accents/(size/50*6),.10,1), tone:heard.tone, mode:heard.mode, key:heard.key, confidence};
 }
 
+export function storyExcerpt(story) {
+  const sentences = story.trim().split(/(?<=[.!?…])\s+|\n+/u).filter(Boolean);
+  const caption = [...sentences].sort((a,b)=>Math.abs(a.length-83)-Math.abs(b.length-83))[0];
+  return caption.length > 152 ? caption.slice(0,148).replace(/\s+\S*$/u,'')+'…' : caption;
+}
+
 // Text gives the eight numbers. Photographs lean them by the warmth, density and light of
 // the frames, then music nudges pace and brightness. The photo also gives the scene its hue.
 // `reading` is {feelings, title, ...} from the language model or from the dictionary on the device.
 export function makeImprint(story, photos, audio, reading, date) {
-  if (!story.trim() || !photos.length) throw Error('Добавьте текст и хотя бы один кадр.');
+  if (!story.trim() || !photos.length) throw Error(t('Добавьте текст и хотя бы один кадр.'));
   const read = reading?.feelings ? reading : localReading(story);
   const text = cleanFeelings(read.feelings);
   const pictured = withPhotos(text, photos);
   const feelings = withMusic(pictured, audio);
   const photo = photos.reduce((a,b)=>a.weight>b.weight?a:b);
   const light = mean(photos.map(frame=>frame.light));
-  const sentences = story.trim().split(/(?<=[.!?…])\s+|\n+/u).filter(Boolean);
-  const caption = [...sentences].sort((a,b)=>Math.abs(a.length-83)-Math.abs(b.length-83))[0];
-  const excerpt = caption.length > 152 ? caption.slice(0,148).replace(/\s+\S*$/u,'')+'…' : caption;
   return {
-    v:5, context:readContext(story, date), title:String(read.title || '').trim() || localTitle(story), excerpt, text, pictured, feelings, moodName:feelingLabel(feelings),
+    v:6, context:readContext(story, date), title:String(read.title || '').trim() || localTitle(story), excerpt:storyExcerpt(story), text, pictured, feelings, moodName:feelingLabel(feelings),
     light, photoHue:Math.round(photo.hue), photoSat:Math.round(photo.sat), ...sceneTokens(feelings, {...photo, light}, audio)
   };
 }

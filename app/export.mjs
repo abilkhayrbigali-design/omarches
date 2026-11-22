@@ -1,11 +1,10 @@
+import {formatDate, language, numberFormat, storyLanguage, t} from './i18n.mjs';
 import {foldDiary, motionLine, siteTokens} from './feelings.mjs';
-import {escape, rulesHTML, sceneHTML, stampSVG, themeStyle} from './scene.mjs';
+import {escape, placeLine, rulesHTML, sceneHTML, stampSVG, themeStyle} from './scene.mjs';
 import {contextPageHTML} from './context.mjs';
+import {weatherLayer} from './weather.mjs';
 
 const encoder = new TextEncoder();
-const dateFormat = new Intl.DateTimeFormat('ru-RU',{day:'numeric', month:'long', year:'numeric', timeZone:'UTC'});
-const formatDate = date => dateFormat.format(new Date(date+'T12:00:00Z')).replace(' г.','');
-
 const crcTable = Uint32Array.from({length:256},(_,index)=>{
   let value=index;
   for(let bit=0;bit<8;bit++) value=(value>>>1)^((value&1)?0xedb88320:0);
@@ -57,12 +56,16 @@ async function asset(url) {
   return response.blob();
 }
 
-function offlineScene() {
+function offlineScene(labels) {
   // The page enters once in the character of the day, as it does in the diary.
   const page=document.querySelector('main');
   page.classList.add('entering');
   setTimeout(()=>page.classList.remove('entering'),3200);
   const scene=document.querySelector('.memory');
+  // The caption under the photograph gets exactly the room it takes.
+  const caption=scene.querySelector('.scene-text');
+  const fit=()=>scene.style.setProperty('--band',Math.ceil(caption.offsetHeight)+'px');
+  fit(); addEventListener('resize',fit); addEventListener('load',fit);
   const frames=[...scene.querySelectorAll('.frame')];
   const dots=[...scene.querySelectorAll('.dot')];
   const audio=document.querySelector('#track');
@@ -79,7 +82,7 @@ function offlineScene() {
   function play(value) {
     clearInterval(timer);
     active=value;
-    toggle.textContent=value?'Пауза':'Воспроизвести';
+    toggle.textContent=value?labels.pause:labels.play;
     toggle.setAttribute('aria-pressed',String(value));
     scene.classList.toggle('playing',value);
     if(value && frames.length>1) timer=setInterval(()=>show(frame+1),Number(scene.dataset.duration)*1000);
@@ -96,8 +99,8 @@ function offlineScene() {
     audio.play().catch(()=>{
       if(audio.dataset.stream==='true') {
         play(true);
-        document.querySelector('#stream-status').textContent='Показ кадров без звука. Для прослушивания подключитесь к интернету или откройте страницу трека.';
-      } else toggle.textContent='Аудио недоступно';
+        document.querySelector('#stream-status').textContent=labels.silent;
+      } else toggle.textContent=labels.noAudio;
     });
   });
   audio?.addEventListener('play',()=>{voice?.pause();play(true);});
@@ -124,10 +127,10 @@ function creditLink(url, label) {
 
 function catalogCredit(music) {
   if (music.origin !== 'catalog') return '';
-  const source = creditLink(music.sourceUrl || music.url, music.provider || 'Страница трека');
-  const license = creditLink(music.licenseUrl, music.license || music.rights?.label || 'Условия использования');
-  const description = music.rights?.description ? `<p>${escape(music.rights.description)}</p>` : '';
-  return `<section class="reading"><h2>Музыка в записи</h2><p>${escape(music.track)} · ${escape(music.artist || 'Автор не указан')}</p><p>Источник — ${source}. Лицензия — ${license}.</p>${description}<a href="music-rights.txt">Сведения для публикации</a></section>`;
+  const source = creditLink(music.sourceUrl || music.url, music.provider || t('Страница трека'));
+  const license = creditLink(music.licenseUrl, music.license || music.rights?.label || t('Условия использования'));
+  const description = music.rights?.description ? `<p>${escape(t(music.rights.description))}</p>` : '';
+  return `<section class="reading"><h2>${t("Музыка в записи")}</h2><p>${escape(music.track)} · ${escape(music.artist || t('Автор не указан'))}</p><p>${t("Источник —")} ${source}${t(". Лицензия —")} ${license}.</p>${description}<a href="music-rights.txt">${t("Сведения для публикации")}</a></section>`;
 }
 
 async function narrationForExport(day) {
@@ -137,7 +140,7 @@ async function narrationForExport(day) {
   const audio = recording ? recording.blob : await asset(day.narration);
   const mime = recording ? audio.type.toLowerCase().split(';')[0] : 'audio/mpeg';
   const formats = {'audio/mpeg':'mp3', 'audio/mp3':'mp3', 'audio/wav':'wav', 'audio/x-wav':'wav', 'audio/wave':'wav'};
-  if (!formats[mime]) throw Error('Неизвестный формат озвучки.');
+  if (!formats[mime]) throw Error(t('Неизвестный формат озвучки.'));
   const file = 'voice.'+formats[mime];
   const voiceId = recording ? recording.voiceId : day.narrationVoice;
   const voiceName = recording ? recording.voiceName : day.narrationVoiceName;
@@ -148,31 +151,33 @@ async function narrationForExport(day) {
 function documentHTML(day, names, soundtrack, narration) {
   const {imprint,music}=day;
   const rightsLabel=music.rights?.label
-    ? `<span><a href="music-rights.txt" title="Условия использования трека">${escape(music.rights.label)}</a></span>`
+    ? `<span><a href="music-rights.txt" title="${t("Условия использования трека")}">${escape(t(music.rights.label))}</a></span>`
     : '';
   const media=music.kind==='link'
-    ? `<a class="plain bordered" href="${escape(externalUrl(music.url || music.sourceUrl))}" target="_blank" rel="noopener noreferrer">${music.origin==='catalog'?'Послушать в интернете':'Открыть песню'}</a>`
+    ? `<a class="plain bordered" href="${escape(externalUrl(music.url || music.sourceUrl))}" target="_blank" rel="noopener noreferrer">${music.origin==='catalog'?t('Послушать в интернете'):t('Открыть песню')}</a>`
     : `<audio id="track" controls preload="${music.kind==='remote'?'none':'metadata'}" data-stream="${music.kind==='remote'}" src="${escape(soundtrack)}"></audio>`;
   const streamingDetails = music.kind==='remote'
-    ? `<p class="hint"><span id="stream-status" role="status">Для прослушивания музыки нужен интернет.</span> ${creditLink(music.sourceUrl || music.url,'Открыть страницу трека')}</p>`
+    ? `<p class="hint"><span id="stream-status" role="status">${t("Для прослушивания музыки нужен интернет.")}</span> ${creditLink(music.sourceUrl || music.url,t('Открыть страницу трека'))}</p>`
     : '';
   const voiceLabel = narration?.voiceName
-    ? `<p>${escape(narration.voiceName)} · автоматическая подача</p>` : '';
+    ? `<p>${escape(narration.voiceName)} ${t("· автоматическая подача")}</p>` : '';
   const voicePlayer = narration
-    ? `${voiceLabel}<audio id="voice" controls preload="none" src="${escape(narration.file)}" aria-label="Озвучка текста"></audio>` : '';
+    ? `${voiceLabel}<audio id="voice" controls preload="none" src="${escape(narration.file)}" aria-label="${t("Озвучка текста")}"></audio>` : '';
   // The folder carries its own numbers, so the page looks the same without the diary.
-  const site=siteTokens(imprint.feelings,{hue:imprint.hue});
+  const site=siteTokens(imprint.feelings,{hue:imprint.hue,light:imprint.place==='print'});
+  const controls = {play:t('Воспроизвести'), pause:t('Пауза'), noAudio:t('Аудио недоступно'),
+    silent:t('Показ кадров без звука. Для прослушивания подключитесь к интернету или откройте страницу трека.')};
   return `<!doctype html>
-<html lang="ru" data-face="${site.face}" style="${themeStyle(site)}"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escape(imprint.title)} — Оттиск</title><link rel="stylesheet" href="../assets/style.css">
-<body><header class="top"><span class="brand"><span class="mark">${stampSVG(imprint.feelings)}</span> Оттиск</span></header>
+<html lang="${language}" data-face="${site.face}" style="${themeStyle(site)}"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escape(imprint.title)} ${t("— Оттиск")}</title><link rel="stylesheet" href="../assets/style.css">
+<body><header class="top"><span class="brand"><span class="mark">${stampSVG(imprint.feelings)}</span> ${t("Оттиск")}</span></header>
 <main style="padding-top:24px">
 ${sceneHTML(day,names,formatDate(day.date))}
-<div class="transport"><button id="play" class="primary" type="button" aria-pressed="false">Воспроизвести</button>${names.length>1?'<button id="next" class="plain bordered">Следующий кадр</button>':''}<div class="track"><strong>${escape(music.track)}</strong>${rightsLabel}</div>${media}</div>
+<div class="transport"><button id="play" class="primary" type="button" aria-pressed="false">${t("Воспроизвести")}</button>${names.length>1?`<button id="next" class="plain bordered">${t("Следующий кадр")}</button>`:''}<div class="track"><strong>${escape(music.track)}</strong>${rightsLabel}</div>${media}</div>
 ${streamingDetails}
-<section class="notes"><div><h2>Запись дня</h2><p class="story">${escape(day.story)}</p>${voicePlayer}</div><div class="reading"><h2>Как собрана сцена</h2><div class="mood-stamp">${stampSVG(imprint.feelings,{labels:true,title:'Оттиск дня: '+imprint.moodName})}</div>${rulesHTML(imprint)}<p class="hint">${imprint.duration.toFixed(1)} с на кадр по темпу музыки. ${escape(motionLine(imprint.feelings))}</p></div></section>
+<section class="notes"><div><h2>${t("Запись дня")}</h2><p class="story" lang="${storyLanguage(day.story)}">${escape(day.story)}</p>${voicePlayer}</div><div class="reading"><h2>${t("Как собрана сцена")}</h2><div class="mood-stamp">${stampSVG(imprint.feelings,{labels:true,title:t('Оттиск дня: ')+imprint.moodName})}</div>${rulesHTML(imprint)}<p class="hint">${numberFormat(imprint.duration,{maximumFractionDigits:1})} ${t("с на кадр по темпу музыки.")} ${escape(motionLine(imprint.feelings))} ${escape(placeLine(imprint))}</p></div></section>
 ${catalogCredit(music)}
-${contextPageHTML(imprint.context, imprint)}</main><script>(${offlineScene.toString()})();</script></body></html>`;
+${contextPageHTML(imprint.context, imprint)}</main><script>(${offlineScene.toString()})(${JSON.stringify(controls).replace(/</g, '\\u003c')});(${weatherLayer.toString()})();</script></body></html>`;
 }
 
 async function dayEntries(day, folder) {
@@ -189,9 +194,9 @@ async function dayEntries(day, folder) {
   if(music.kind==='remote') {
     soundtrack=externalUrl(music.source);
     const source=externalUrl(music.sourceUrl || music.url);
-    entries.push([`${folder}/music.txt`,`${music.track}\nДля прослушивания музыки нужен интернет.\nАудиопоток — ${soundtrack}\nСтраница трека — ${source}\n`]);
+    entries.push([`${folder}/music.txt`,`${music.track}\n${t('Для прослушивания музыки нужен интернет.')}\n${t('Аудиопоток —')} ${soundtrack}\n${t('Страница трека —')} ${source}\n`]);
   } else if(music.kind==='link') {
-    const instructions=music.origin==='catalog'?'Для прослушивания откройте ссылку при подключении к интернету.\n':'';
+    const instructions=music.origin==='catalog'?t('Для прослушивания откройте ссылку при подключении к интернету.\n'):'';
     entries.push([`${folder}/music.txt`,`${music.track}\n${instructions}${externalUrl(music.url || music.sourceUrl)}\n`]);
   } else {
     const mime=music.blob?.type?.split(';')[0];
@@ -201,13 +206,13 @@ async function dayEntries(day, folder) {
   }
   if(music.rights?.label || music.origin==='catalog') {
     const credits = music.origin==='catalog' ? [
-      music.artist && 'Автор — '+music.artist,
-      music.provider && 'Каталог — '+music.provider,
+      music.artist && t('Автор — ')+music.artist,
+      music.provider && t('Каталог — ')+music.provider,
       externalUrl(music.sourceUrl || music.url),
-      music.license && 'Лицензия — '+music.license,
+      music.license && t('Лицензия — ')+music.license,
       externalUrl(music.licenseUrl)
     ] : [];
-    const text=['Условия использования музыки',music.track,...credits,music.rights?.label,music.rights?.description].filter(Boolean).join('\n\n');
+    const text=[t('Условия использования музыки'),music.track,...credits,music.rights?.label && t(music.rights.label),music.rights?.description && t(music.rights.description)].filter(Boolean).join('\n\n');
     entries.push([`${folder}/music-rights.txt`,text+'\n']);
   }
   const voice = await narrationForExport(day);
@@ -232,7 +237,7 @@ async function download(days, filename) {
   }
   const ordered=[...days].sort((a,b)=>a.date.localeCompare(b.date)||a.created-b.created);
   const mood=foldDiary(ordered.map(day=>day.imprint.feelings));
-  entries.push(['index.html',`<!doctype html><html lang="ru" style="${themeStyle(siteTokens(mood.state,{keep:mood.lead,keepSecond:mood.second}))}"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Архив — Оттиск</title><link rel="stylesheet" href="assets/style.css"><body><main class="welcome"><h1>Архив дней</h1><ul>${links.join('')}</ul></main></body></html>`]);
+  entries.push(['index.html',`<!doctype html><html lang="${language}" style="${themeStyle(siteTokens(mood.state,{keep:mood.lead,keepSecond:mood.second}))}"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${t("Архив — Оттиск")}</title><link rel="stylesheet" href="assets/style.css"><body><main class="welcome"><h1>${t("Архив дней")}</h1><ul>${links.join('')}</ul></main></body></html>`]);
   const url=URL.createObjectURL(await zip(entries));
   const anchor=document.createElement('a');
   anchor.href=url;
@@ -242,4 +247,4 @@ async function download(days, filename) {
 }
 
 export const downloadDay = day => download([day],folderName(day));
-export const downloadArchive = days => download(days,'Оттиск — архив');
+export const downloadArchive = days => download(days,t('Оттиск — архив'));

@@ -87,7 +87,7 @@ class handler(BaseHTTPRequestHandler):
         if not allowed(address):
             return self.reply(429, {"code": "busy", "message": "Слишком много записей подряд. Подождите минуту."})
         try:
-            self.reply(200, read_story(story.strip(), key()))
+            self.reply(200, read_story(story.strip(), key(), data.get("reasonLanguage", "ru")))
         except ReadingError as exc:
             self.reply(exc.status, {"code": exc.code, "message": str(exc)})
 

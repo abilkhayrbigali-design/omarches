@@ -1,3 +1,4 @@
+import {inLanguage, locale, numberFormat, storyLanguage, t} from './i18n.mjs';
 // A day is described by eight numbers from 0 to 1. They sit on a wheel so that
 // every feeling faces its opposite: index i and index i + 4 form a pair.
 export const FEELINGS = [
@@ -13,7 +14,7 @@ export const FEELINGS = [
 export const IDS = FEELINGS.map(feeling => feeling.id);
 const BY_ID = new Map(FEELINGS.map(feeling => [feeling.id, feeling]));
 export const opposite = id => IDS[(IDS.indexOf(id) + 4) % 8];
-export const feelingName = id => BY_ID.get(id).name;
+export const feelingName = (id, lang) => inLanguage(lang ?? locale().slice(0, 2), BY_ID.get(id).name);
 
 // Each pair owns one layer of the design, so mixed days never fight over the same control.
 export const PAIRS = [
@@ -136,38 +137,49 @@ const TAIL_DROP = new Set(('в во на с со к ко по за из от д�
   'мы я он она они ее её его их мне меня нам нас не ни же бы ли то это этот эта очень так уже еще ещё только пока сих пор').split(' '));
 const VERB = /(?:л|ла|ли|ло|лся|лась|лись|лось|ть|ться|тся|ешь|ете|ют|ут|ит|ят)$/;
 
-function trimTitle(list) {
+const TITLE_WORDS = {
+  ru: [LEAD_DROP, TAIL_DROP],
+  en: [new Set('today yesterday then afterwards finally i we he she they it there and but'.split(' ')),
+    new Set('a an the to from in on at for by of with as and or but that i we it'.split(' '))],
+  kk: [new Set('бүгін кеше кейін сосын біз мен ол олар енді ақыры және бірақ'.split(' ')),
+    new Set('мен және немесе бірақ да де та те үшін туралы қарай сияқты'.split(' '))]
+};
+
+function trimTitle(list, lang) {
+  const [leading, trailing] = TITLE_WORDS[lang];
   const result = [...list];
-  while (result.length && LEAD_DROP.has(result[0].toLowerCase())) result.shift();
+  while (result.length && leading.has(result[0].toLowerCase())) result.shift();
   // Up to seven words, so a two-word name at the end («Mega Silkway») is not cut in half.
   if (result.length > 7) result.length = 7;
-  while (result.length && TAIL_DROP.has(result.at(-1).toLowerCase())) result.pop();
+  while (result.length && trailing.has(result.at(-1).toLowerCase())) result.pop();
   return result;
 }
 
-export function localTitle(story) {
+export function localTitle(story, lang = storyLanguage(story)) {
+  const [leading, trailing] = TITLE_WORDS[lang];
   const clauses = String(story ?? '').split(/[.!?…\n;:,—–]+/u)
-    .map(clause => trimTitle(clause.match(/[\p{L}\p{N}]+(?:-[\p{L}\p{N}]+)*/gu) || []))
+    .map(clause => trimTitle(clause.match(/[\p{L}\p{N}]+(?:[-’'][\p{L}\p{N}]+)*/gu) || [], lang))
     .filter(list => list.length >= 3);
   let best = null;
   for (const list of clauses) {
     const lower = list.map(word => word.toLowerCase().replaceAll('ё', 'е'));
-    const content = lower.filter(word => word.length > 2 && !TAIL_DROP.has(word) && !LEAD_DROP.has(word));
-    const verbs = content.filter(word => VERB.test(word)).length;
+    const content = lower.filter(word => word.length > 2 && !trailing.has(word) && !leading.has(word));
+    const verbs = lang === 'ru' ? content.filter(word => VERB.test(word)).length : 0;
     const vivid = lower.filter((word, index) => cueHits(lower, index).length).length;
     const score = (content.length - verbs) + vivid * .7 - verbs * .6 - Math.abs(list.length - 4) * .25;
     if (!best || score > best.score) best = {list, score};
   }
-  const fallback = trimTitle(String(story ?? '').match(/[\p{L}\p{N}]+(?:-[\p{L}\p{N}]+)*/gu) || []).slice(0, 5);
+  const fallback = trimTitle(String(story ?? '').match(/[\p{L}\p{N}]+(?:[-’'][\p{L}\p{N}]+)*/gu) || [], lang).slice(0, 5);
   const chosen = best?.list || fallback;
-  if (!chosen.length) return 'День без слов';
+  if (!chosen.length) return inLanguage(lang, 'День без слов');
   const title = chosen.join(' ');
-  return title[0].toLocaleUpperCase('ru') + title.slice(1);
+  return title[0].toLocaleUpperCase(locale(lang)) + title.slice(1);
 }
 
 export function localReading(story) {
-  return {feelings: localFeelings(story), title: localTitle(story), source: 'local',
-    reason: 'Настроение оценил словарь на устройстве по словам записи.'};
+  const lang = storyLanguage(story);
+  return {feelings: localFeelings(story), title: localTitle(story, lang), language: lang, source: 'local',
+    reason: t('Настроение оценил словарь на устройстве по словам записи.')};
 }
 
 // ---------------------------------------------------------------------------
@@ -251,8 +263,8 @@ export function ranking(feelings, keep = null, keepSecond = null) {
 
 export function feelingLabel(feelings, keep = null, keepSecond = null) {
   const {lead, second} = ranking(feelings, keep, keepSecond);
-  if (!lead) return 'Ровный день';
-  return second ? `${feelingName(lead)} и ${feelingName(second).toLowerCase()}` : feelingName(lead);
+  if (!lead) return t('Ровный день');
+  return second ? t`${feelingName(lead)} и ${feelingName(second).toLowerCase()}` : feelingName(lead);
 }
 
 // Calm is the absence of a pull, and it already owns the form. When it leads, the
@@ -305,9 +317,19 @@ export function sceneTokens(feelings, photo, audio) {
   const tempo = audio?.bpm || 72 + drive * 60;
   const duration = clamp(60 / tempo * 8, 2.5, 9);
   const form = formTokens(f);
+  // Composition: six ways to set the frame and the words.
+  //   grid   tension: the words on top, by the accent bar, on the grid;
+  //   burst  a festive day: the title large and centred, tilted;
+  //   low    sadness: the frame is cut short and fades down, the words sink into the far corner;
+  //   air    solitude or quiet: a small frame in wide margins, the caption under it;
+  //   print  joy leads and the photograph is not a night one: a light print, the caption on its margin;
+  //   base   everything else: the words lie on the photograph, bottom left.
   const place = form.face === 'grotesk' ? 'grid'
+    : f.festive >= .55 ? 'burst'
+    : f.sadness >= .45 && f.sadness > f.joy + .1 ? 'low'
     : (f.solitude >= .5 || (f.quiet >= .7 && f.warmth < .5)) && f.festive < .4 ? 'air'
-    : f.festive >= .55 ? 'burst' : 'base';
+    : lead === 'joy' && valence >= .35 && f.tension < .4 && photo.light >= 28 ? 'print'
+    : 'base';
   // The photograph lends the scene its hue, less so on two kinds of day. Sadness drains
   // the frame's own colour and leaves the colour of the feeling. Solitude works like
   // aerial perspective: far things take the cold colour of the air between.
@@ -346,7 +368,7 @@ export function sceneTokens(feelings, photo, audio) {
 }
 
 // The site takes the same numbers at a lower volume: it has to stay a place to read.
-export function siteTokens(feelings, {hue, keep, keepSecond} = {}) {
+export function siteTokens(feelings, {hue, keep, keepSecond, light = false} = {}) {
   const f = feelings;
   const {lead, second} = ranking(f, keep, keepSecond);
   const strength = lead ? f[lead] : 0;
@@ -356,6 +378,8 @@ export function siteTokens(feelings, {hue, keep, keepSecond} = {}) {
   return {
     lead, second, ...form, ...accentFor(f, lead, second, base),
     hue: base,
+    // A print day turns the whole page light; every other day keeps the dark paper.
+    light: Boolean(light),
     paperSat: Math.round(clamp(anchor.sat * .34 * (.4 + .6 * strength), 6, 24)),
     paperLight: round2(clamp(9.5 + 3 * f.joy - 3 * f.sadness + 1.5 * f.warmth - 1.5 * f.tension, 6, 14)),
     glow: round2(.08 + .24 * strength),
@@ -456,6 +480,11 @@ export function motionTokens(feelings) {
     // the picture, sadness lets it sink; on a tense day it moves in jerks.
     camBack: near < -.08 ? 1 : 0, camY, camPad: round2(Math.abs(camY) * .02 + .004),
     camEase: wipe ? `steps(${Math.round(5 + 5 * f.tension)},end)` : f.festive >= .5 ? 'cubic-bezier(.16,1,.3,1)' : 'cubic-bezier(.45,0,.55,1)',
+    // The air of a holiday (ghosts, snow, petals, balloons crossing the page): how fast it
+    // goes, how wide it swings, and whether it glides or twitches.
+    pace: round2(clamp(1 + .6 * f.festive + .45 * f.tension + .15 * f.joy - .45 * f.quiet - .25 * f.calm - .2 * f.sadness, .5, 1.9)),
+    sway: Math.round(clamp(9 + 16 * f.festive + 8 * f.joy + 2 * f.tension - 6 * f.quiet - 4 * f.calm, 4, 30)),
+    airEase: wipe ? 'steps(3,end)' : 'ease-in-out',
     // The page light breathes while the memory plays.
     ambient: Math.round(clamp(9 - 5 * f.festive - 3 * f.tension + 5 * f.quiet + 2 * f.calm, 3, 16) * 10) / 10,
     swell: round2(clamp(.1 + .25 * f.festive + .12 * f.joy + .1 * f.warmth - .1 * f.quiet, .04, .4))
@@ -468,21 +497,21 @@ export function motionTokens(feelings) {
 // The same rule in words, for the block that explains a day.
 export function motionLine(feelings) {
   const m = motionTokens(feelings);
-  const seconds = value => String(value).replace('.', ',') + ' с';
-  const spring = m.bounce >= .02 ? 'Пружина лёгкая, с отскоком'
-    : m.ratio >= 1.15 ? 'Пружина мягкая и тяжёлая, без отскока'
-    : m.stiffness >= 380 ? 'Пружина жёсткая, без отскока' : 'Пружина ровная, без отскока';
+  const seconds = value => numberFormat(value,{maximumFractionDigits:2}) + t(' с');
+  const spring = m.bounce >= .02 ? t('Пружина лёгкая, с отскоком')
+    : m.ratio >= 1.15 ? t('Пружина мягкая и тяжёлая, без отскока')
+    : m.stiffness >= 380 ? t('Пружина жёсткая, без отскока') : t('Пружина ровная, без отскока');
   const from = [];
-  if (m.slide >= 6) from.push('входят сбоку, вдоль сетки');
-  if (m.rise >= 6) from.push('поднимаются снизу');
-  if (m.rise <= -6) from.push('опускаются сверху');
-  if (m.grow <= .97) from.push('приближаются');
-  const title = m.wipe ? 'заголовок открывается резкой шторкой' : m.soft >= 3 ? 'заголовок выходит из расфокуса' : '';
-  const arrive = [from.length ? 'элементы ' + from.join(' и ') : 'элементы проявляются на месте', title].filter(Boolean).join(', ');
-  const camera = (m.camBack ? 'кадр отдаляется' : 'кадр приближается')
-    + (m.camY <= -.3 ? ' и плывёт вверх' : m.camY >= .3 ? ' и опускается' : '') + (m.wipe ? ', рывками' : '');
-  return `${spring}: всё встаёт на место за ${seconds(m.settle)}, следующий элемент через ${seconds(m.step)}. `
-    + `${arrive[0].toUpperCase()}${arrive.slice(1)}. В показе ${camera}.`;
+  if (m.slide >= 6) from.push(t('входят сбоку, вдоль сетки'));
+  if (m.rise >= 6) from.push(t('поднимаются снизу'));
+  if (m.rise <= -6) from.push(t('опускаются сверху'));
+  if (m.grow <= .97) from.push(t('приближаются'));
+  const title = m.wipe ? t('заголовок открывается резкой шторкой') : m.soft >= 3 ? t('заголовок выходит из расфокуса') : '';
+  const arrive = [from.length ? t('элементы ') + from.join(t(' и ')) : t('элементы проявляются на месте'), title].filter(Boolean).join(', ');
+  const camera = (m.camBack ? t('кадр отдаляется') : t('кадр приближается'))
+    + (m.camY <= -.3 ? t(' и плывёт вверх') : m.camY >= .3 ? t(' и опускается') : '') + (m.wipe ? t(', рывками') : '');
+  return t`${spring}: всё встаёт на место за ${seconds(m.settle)}, следующий элемент через ${seconds(m.step)}. `
+    + t`${arrive[0].toUpperCase()}${arrive.slice(1)}. В показе ${camera}.`;
 }
 
 // ---------------------------------------------------------------------------

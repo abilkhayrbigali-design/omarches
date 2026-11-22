@@ -25,6 +25,8 @@ const checks = [
   ['в напряжённый день камера идёт рывками', office.camEase.startsWith('steps(') && !maple.camEase.startsWith('steps(')],
   ['тихий кадр отвечает на курсор слабее и медленнее праздничного', rain.hoverZoom < cake.hoverZoom && rain.hoverTime > cake.hoverTime],
   ['грустный день тяжелее радостного', grief.mass > 1.5 && cake.mass < 1],
+  ['праздничный воздух быстрее и размашистее тихого', cake.pace > 1.4 && rain.pace < .7 && cake.sway >= 3 * rain.sway],
+  ['в напряжённый день воздух дёргается, в спокойный плывёт', office.airEase.startsWith('steps(') && maple.airEase === 'ease-in-out'],
   ['объяснение называет пружину и направление', /с отскоком/.test(motionLine(day({joy: .86, festive: .9, warmth: .82}))) && /шторкой/.test(motionLine(day({tension: .94})))]
 ];
 

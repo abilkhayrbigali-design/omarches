@@ -40,7 +40,7 @@ def verify(target, base):
 
 def main():
     sources = [ROOT / "README.md", ROOT / ".gitignore", ROOT / "server.py"]
-    for folder in ("tools", "app", "hosted"):
+    for folder in ("tools", "app", "hosted", "mood-server"):
         sources += sorted(path for path in (ROOT / folder).rglob("*") if path.is_file() and "__pycache__" not in path.parts)
     source_archive = SUBMISSION / "ottisk-source.zip"
     build(source_archive, [(path, path.relative_to(ROOT).as_posix()) for path in sources])
