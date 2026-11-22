@@ -7,8 +7,12 @@
 // Needs: the diary running (default http://localhost:8765, override with OTTISK_URL),
 // ffmpeg on PATH, Chromium (CHROMIUM, default /usr/bin/chromium) and the
 // playwright-core package (PLAYWRIGHT_CORE may point at its folder).
-// The story, the photos and the song below are the day shown in the video:
-// replace them with your own to record a different day.
+// The story, the photos and the song below are the day shown in the video.
+// To record your own day without putting it into the repository, describe it in
+// my-day/day.json (that folder is ignored by git; DEMO_DAY may name another file):
+//   {"story": "…", "date": "2026-10-31", "photos": ["1.jpg", "2.jpg"],
+//    "song": {"catalog": true, "pick": "часть названия"}, "ai": true}
+// Paths in the file are relative to the file itself.
 // For a trial take, DEMO_CATALOG=1 picks the song from the catalogue and
 // DEMO_NO_AI=1 keeps the text on this computer (no paid requests).
 import {spawn} from 'node:child_process';
@@ -33,8 +37,16 @@ const day = {
   // (the diary searches the catalogue by the story; without `pick` the first track is taken).
   song: {file: path.join(root, 'app/media/train.mp3'), name: 'Первый свет.mp3'},
   // false leaves the text on this computer: the dictionary reads it instead of the model.
-  ai: true
+  ai: true,
+  // The date of the day as YYYY-MM-DD; without it the form keeps today's date.
+  date: null
 };
+const ownDay = process.env.DEMO_DAY || path.join(root, 'my-day', 'day.json');
+if (fs.existsSync(ownDay)) {
+  const own = JSON.parse(fs.readFileSync(ownDay, 'utf8'));
+  const beside = file => path.resolve(path.dirname(ownDay), file);
+  Object.assign(day, own, {photos: own.photos.map(beside), song: own.song.file ? {...own.song, file: beside(own.song.file)} : own.song});
+}
 if (process.env.DEMO_CATALOG) day.song = {catalog: true};
 if (process.env.DEMO_NO_AI) day.ai = false;
 
@@ -147,9 +159,11 @@ await top();
 // 2. A new day: text, photographs, a song.
 say('Шаг 1. Рассказ о дне: текстом или голосом');
 await click('#compose');
+if (day.date) await page.fill('input[name=date]', day.date);
 await pause(.8);
 await click('textarea[name=story]');
-await page.keyboard.type(day.story, {delay: 30});
+// A long entry is typed faster, so the step takes about the same time for any text.
+await page.keyboard.type(day.story, {delay: Math.round(Math.max(8, Math.min(30, 6000 / day.story.length)))});
 await pause(.8);
 say('Автор сам решает, читать ли запись с помощью ИИ');
 if (await page.isVisible('#ai-consent')) {
@@ -170,8 +184,16 @@ await page.waitForFunction(() => !document.querySelector('#music-progress').text
 await pause(1.8);
 if (day.song.catalog) {
   await page.waitForSelector('#music-picks .music-option', {timeout: 30000});
-  if (day.song.pick) await click(`#music-picks .music-option:has-text("${day.song.pick}")`);
-  else await point('#music-picks .music-option');
+  if (day.song.pick) {
+    const wanted = `#music-picks .music-option:has-text(${JSON.stringify(day.song.pick)})`;
+    // The track may be further down the list: ask for more, the way a person would.
+    for (let more = 0; more < 4 && !(await page.locator(wanted).count()) && await page.isVisible('#music-more'); more++) {
+      await click('#music-more');
+      await page.waitForFunction(() => !document.querySelector('#music-more').disabled, null, {timeout: 20000});
+      await pause(1.2);
+    }
+    await click(wanted);
+  } else await point('#music-picks .music-option');
   await pause(2.4);
   credit = await page.evaluate(() => ({title: document.querySelector('#preview-title').textContent,
     terms: document.querySelector('#catalog-credit').textContent, url: document.querySelector('#music-preview').src}));
@@ -186,6 +208,7 @@ if (day.song.catalog) {
 say(day.ai ? 'Модель читает запись: числа настроения и название папки дня' : 'Дневник читает запись: числа настроения и название папки дня');
 await click('#day-form [type=submit]');
 await page.waitForSelector('.memory', {timeout: 60000});
+const dayTitle = await page.textContent('#day-heading');
 await listen('.transport audio', 'music');
 await pause(4.2);
 
@@ -241,16 +264,29 @@ const voice = await page.locator('#narrator-audio').evaluate(async audio => {
   return {data: btoa(text), duration: audio.duration};
 });
 fs.writeFileSync(voiceFile, Buffer.from(voice.data, 'base64'));
-await page.waitForFunction(() => document.querySelector('#narrator-audio').ended, null, {timeout: 90000});
+// A long entry takes most of a minute to read aloud: the video keeps the first twelve seconds.
+await page.waitForFunction(() => { const audio = document.querySelector('#narrator-audio'); return audio.ended || audio.currentTime >= 12; }, null, {timeout: 90000});
+if (!(await page.locator('#narrator-audio').evaluate(audio => audio.ended))) await click('#voice');
 await pause(.8);
 
 // 6. Back in the archive: the diary has moved a little.
-say('Новая запись понемногу сдвинула числа всего дневника: стрелки показывают, на сколько');
 await top();
 await click('.back');
-await pause(2.6);
-await glide('.diary-mood');
-await pause(5.4);
+await page.waitForSelector('.day-card');
+if (await page.evaluate(title => document.querySelector('.featured h2')?.textContent === title, dayTitle)) {
+  say('Новая запись понемногу сдвинула числа всего дневника: стрелки показывают, на сколько');
+  await pause(2.6);
+  await glide('.diary-mood');
+  await pause(5.4);
+} else {
+  // A day from the past takes its place by date; the diary is replayed in order with it.
+  say('Запись встала в архив по своей дате, и числа дневника пересчитались по всем дням по порядку');
+  await pause(2);
+  await glide('.diary-mood');
+  await pause(3.6);
+  await glide(`.day-card:has-text(${JSON.stringify(dayTitle)})`);
+  await pause(3.4);
+}
 say('У напряжённого дня другой шрифт, сетка и прямые углы — меняется весь сайт');
 await glide('#archive-grid', 'start');
 await pause(1);
