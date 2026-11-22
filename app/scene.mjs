@@ -15,7 +15,7 @@ export function sceneStyle(imprint) {
   return [
     ...IDS.map(id => `--${id}:${i.feelings[id]}`),
     `--hue:${i.hue}`, `--sat:${i.saturation}%`, `--base:${i.dark}%`, `--wash:${i.wash}`, `--grain:${i.grain}`,
-    `--contrast:${i.contrast}`, `--filter-sat:${i.filterSat}`, `--sepia:${i.sepia}`, `--bright:${i.bright}`,
+    `--contrast:${i.contrast}`, `--filter-sat:${i.filterSat}`, `--sepia:${i.sepia}`, `--bright:${i.bright}`, `--matte:${i.matte ?? 0}`,
     `--inset:${i.inset}%`, `--radius:${i.radius}px`, `--title-scale:${i.titleScale}`, `--title-weight:${i.titleWeight}`,
     `--title-track:${i.tracking}em`, `--tilt:${i.tilt}deg`, `--fade:${i.fade}s`, `--dwell:${i.duration}s`, `--drift:${i.drift}`,
     `--scene-accent:hsl(${i.accentHue} ${i.accentSat}% ${i.accentLight}%)`
@@ -281,14 +281,16 @@ export function rulesHTML(imprint) {
   const rules = [];
   const say = (id, text) => { if (f[id] >= .3) rules.push([id, text]); };
   say('joy', 'кадр светлее, цвета насыщеннее');
-  say('sadness', 'кадр темнее и глуше, по краям тень');
+  say('sadness', 'кадр темнее и глуше, по краям тень' + ((imprint.matte ?? 0) >= .15 ? ', тени выцветают в серую дымку, как на старом отпечатке, цвет кадра бледнеет' : ''));
   const shown = value => value >= TREAT_FROM;
-  say('calm', 'мягкие углы, длинные растворения' + (!shown(imprint.paint) ? '' : imprint.sweep >= .45 ? ', кадр ложится длинными ровными мазками' : ', кадр распадается на короткие мазки'));
+  // Calm gives no colour of its own; the line says so only when it would otherwise have given one.
+  const plain = imprint.lead === 'calm' || imprint.second === 'calm' ? ', своего цвета не даёт: сцена в одном цвете, акцент — светлый тон того же цвета' : '';
+  say('calm', 'мягкие углы, длинные растворения' + plain + (!shown(imprint.paint) ? '' : imprint.sweep >= .45 ? ', кадр ложится длинными ровными мазками' : ', кадр распадается на короткие мазки'));
   say('tension', (imprint.face === 'grotesk' ? 'сетка, рубленый заголовок, резкие склейки' : 'контраст выше, углы острее') + (shown(imprint.plane) ? ', кадр собран в плоскости цвета' : ''));
   say('festive', 'световые следы, крупный заголовок, быстрый ритм' + (shown(imprint.smear) ? ', свет на кадре тянется, как при длинной выдержке' : ''));
   say('quiet', 'мало движения, заголовок меньше, графика приглушена');
   say('warmth', 'тёплая засветка и плёночное зерно');
-  say('solitude', 'поля вокруг кадра, линия горизонта, холоднее цвет');
+  say('solitude', 'поля вокруг кадра, линия горизонта, цвет кадра уходит в холодный воздух, как у дальних гор');
   // What the entry is about (a holiday, the weather) is listed after what it felt like.
   const signs = contextRules(imprint.context).map(rule => `<li><b>${escape(rule.label)}</b> ${escape(rule.text)}</li>`).join('');
   if (!rules.length && !signs) return '<p class="hint">Ярких чувств в записи не нашлось, поэтому сцена оформлена нейтрально.</p>';

@@ -118,7 +118,14 @@ nav,.archive-actions{display:flex;align-items:center;gap:24px}
 .leak{z-index:1;mix-blend-mode:screen;background:
   radial-gradient(90% 85% at 100% 0%,hsl(28 95% 60% / calc(var(--warmth) * .5)),transparent 62%),
   linear-gradient(180deg,hsl(46 90% 70% / calc(var(--joy) * .2)),transparent 45%),
-  linear-gradient(180deg,hsl(210 25% 88% / calc(var(--quiet) * .16 + var(--solitude) * .12)),transparent 55%)}
+  linear-gradient(180deg,hsl(210 25% 88% / calc(var(--quiet) * .16 + var(--solitude) * .12)),transparent 55%),
+  linear-gradient(hsl(218 18% 30% / calc(var(--matte,0) * .55)),hsl(218 18% 30% / calc(var(--matte,0) * .55)))}
+/* A card has no figures, so its form and light are drawn by the same numbers in two cheap layers:
+   tension rules a grid over the frame, sadness and solitude close the edges. */
+.thumb::before{content:"";position:absolute;inset:0;z-index:3;pointer-events:none;background:
+  repeating-linear-gradient(90deg,hsl(0 0% 100% / calc(var(--tension) * .16)) 0 1px,transparent 1px 12.5%),
+  repeating-linear-gradient(0deg,hsl(0 0% 100% / calc(var(--tension) * .16)) 0 1px,transparent 1px 20%),
+  radial-gradient(120% 100% at 50% 40%,transparent 42%,hsl(226 40% 6% / calc(var(--sadness) * .6 + var(--solitude) * .25)))}
 .motif{z-index:2;mix-blend-mode:screen;opacity:calc(.95 - var(--quiet) * .5)}
 /* Keeps the words readable; sadness and solitude darken the edges. */
 .scrim{z-index:3;background:
